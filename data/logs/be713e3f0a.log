@@ -1,0 +1,252 @@
+[clip] download https://www.youtube.com/watch?v=FmlCcwSlGhw client default
+[youtube] Extracting URL: https://www.youtube.com/watch?v=FmlCcwSlGhw
+[youtube] FmlCcwSlGhw: Downloading webpage
+[youtube] FmlCcwSlGhw: Downloading web embedded client config
+[youtube] FmlCcwSlGhw: Downloading player cbcfbf2f-main
+[youtube] FmlCcwSlGhw: Downloading web embedded player API JSON
+[youtube] FmlCcwSlGhw: Downloading tv samsung player API JSON
+[youtube] [jsc:deno] Solving JS challenges using deno
+[youtube] FmlCcwSlGhw: Downloading m3u8 information
+[info] FmlCcwSlGhw: Downloading 1 format(s): 137+140-18
+[download] Destination: D:\Clipper-Windows\Clipper\work\FmlCcwSlGhw\video.f137.mp4
+
+[download]   0.0% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]   0.0% of  127.36MiB at    2.93MiB/s ETA 00:43  
+[download]   0.0% of  127.36MiB at    6.83MiB/s ETA 00:18
+[download]   0.0% of  127.36MiB at    6.84MiB/s ETA 00:18
+[download]   0.0% of  127.36MiB at   14.13MiB/s ETA 00:09
+[download]   0.0% of  127.36MiB at   28.71MiB/s ETA 00:04
+[download]   0.1% of  127.36MiB at   39.50MiB/s ETA 00:03
+[download]   0.2% of  127.36MiB at   22.12MiB/s ETA 00:05
+[download]   0.4% of  127.36MiB at   15.12MiB/s ETA 00:08
+[download]   0.8% of  127.36MiB at   16.30MiB/s ETA 00:07
+[download]   1.6% of  127.36MiB at   15.46MiB/s ETA 00:08
+[download]   3.1% of  127.36MiB at   26.43MiB/s ETA 00:04
+[download]   6.3% of  127.36MiB at   20.29MiB/s ETA 00:05
+[download]   7.6% of  127.36MiB at   23.46MiB/s ETA 00:05
+[download]   7.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]   7.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]   7.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]   7.6% of  127.36MiB at   14.63MiB/s ETA 00:08  
+[download]   7.6% of  127.36MiB at   30.23MiB/s ETA 00:03
+[download]   7.7% of  127.36MiB at   61.44MiB/s ETA 00:04
+[download]   7.7% of  127.36MiB at   58.19MiB/s ETA 00:02
+[download]   7.8% of  127.36MiB at  116.85MiB/s ETA 00:01
+[download]   8.0% of  127.36MiB at  120.86MiB/s ETA 00:00
+[download]   8.4% of  127.36MiB at  118.95MiB/s ETA 00:00
+[download]   9.2% of  127.36MiB at  116.94MiB/s ETA 00:00
+[download]  10.7% of  127.36MiB at   19.13MiB/s ETA 00:05
+[download]  13.9% of  127.36MiB at   28.20MiB/s ETA 00:03
+[download]  15.1% of  127.36MiB at   18.86MiB/s ETA 00:05
+[download]  15.1% of  127.36MiB at  271.78KiB/s ETA 06:47
+[download]  15.1% of  127.36MiB at  815.33KiB/s ETA 02:15
+[download]  15.1% of  127.36MiB at    1.46MiB/s ETA 01:13
+[download]  15.1% of  127.36MiB at    3.13MiB/s ETA 00:34
+[download]  15.2% of  127.36MiB at    6.47MiB/s ETA 00:16
+[download]  15.2% of  127.36MiB at   10.84MiB/s ETA 00:09
+[download]  15.2% of  127.36MiB at   21.85MiB/s ETA 00:04
+[download]  15.3% of  127.36MiB at   43.86MiB/s ETA 00:02
+[download]  15.5% of  127.36MiB at   65.01MiB/s ETA 00:01
+[download]  15.9% of  127.36MiB at   89.25MiB/s ETA 00:01
+[download]  16.7% of  127.36MiB at   99.02MiB/s ETA 00:01
+[download]  18.3% of  127.36MiB at   91.35MiB/s ETA 00:01
+[download]  21.4% of  127.36MiB at   30.76MiB/s ETA 00:03
+[download]  22.9% of  127.36MiB at   23.14MiB/s ETA 00:04
+[download]  22.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  22.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  22.9% of  127.36MiB at    6.83MiB/s ETA 00:14  
+[download]  22.9% of  127.36MiB at   14.65MiB/s ETA 00:06
+[download]  22.9% of  127.36MiB at   30.27MiB/s ETA 00:03
+[download]  22.9% of  127.36MiB at   30.74MiB/s ETA 00:03
+[download]  23.0% of  127.36MiB at   61.96MiB/s ETA 00:01
+[download]  23.1% of  127.36MiB at   99.39MiB/s ETA 00:00
+[download]  23.3% of  127.36MiB at  110.62MiB/s ETA 00:00
+[download]  23.7% of  127.36MiB at  117.36MiB/s ETA 00:00
+[download]  24.5% of  127.36MiB at   74.33MiB/s ETA 00:01
+[download]  26.0% of  127.36MiB at   38.97MiB/s ETA 00:02
+[download]  29.2% of  127.36MiB at   21.25MiB/s ETA 00:04
+[download]  30.7% of  127.36MiB at   25.36MiB/s ETA 00:03
+[download]  30.7% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  30.7% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  30.7% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  30.7% of  127.36MiB at   13.20MiB/s ETA 00:06  
+[download]  30.8% of  127.36MiB at   27.28MiB/s ETA 00:03
+[download]  30.8% of  127.36MiB at   29.09MiB/s ETA 00:03
+[download]  30.8% of  127.36MiB at   58.64MiB/s ETA 00:01
+[download]  30.9% of  127.36MiB at   79.86MiB/s ETA 00:01
+[download]  31.1% of  127.36MiB at  121.31MiB/s ETA 00:00
+[download]  31.5% of  127.36MiB at   12.03MiB/s ETA 00:07
+[download]  32.3% of  127.36MiB at   13.40MiB/s ETA 00:06
+[download]  33.9% of  127.36MiB at   18.51MiB/s ETA 00:04
+[download]  37.0% of  127.36MiB at   19.77MiB/s ETA 00:04
+[download]  38.5% of  127.36MiB at   21.10MiB/s ETA 00:03
+[download]  38.5% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  38.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  38.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  38.6% of  127.36MiB at   14.63MiB/s ETA 00:05  
+[download]  38.6% of  127.36MiB at   30.23MiB/s ETA 00:02
+[download]  38.6% of  127.36MiB at   61.44MiB/s ETA 00:01
+[download]  38.6% of  127.36MiB at   61.95MiB/s ETA 00:01
+[download]  38.7% of  127.36MiB at   99.12MiB/s ETA 00:00
+[download]  38.9% of  127.36MiB at  110.52MiB/s ETA 00:00
+[download]  39.3% of  127.36MiB at  114.13MiB/s ETA 00:00
+[download]  40.1% of  127.36MiB at  112.30MiB/s ETA 00:00
+[download]  41.7% of  127.36MiB at   18.89MiB/s ETA 00:03
+[download]  44.8% of  127.36MiB at   23.05MiB/s ETA 00:03
+[download]  46.1% of  127.36MiB at   16.97MiB/s ETA 00:04
+[download]  46.1% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  46.1% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  46.1% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  46.1% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  46.1% of  127.36MiB at   30.12MiB/s ETA 00:02  
+[download]  46.2% of  127.36MiB at   61.21MiB/s ETA 00:01
+[download]  46.2% of  127.36MiB at   61.83MiB/s ETA 00:01
+[download]  46.3% of  127.36MiB at  124.15MiB/s ETA 00:00
+[download]  46.5% of  127.36MiB at  133.34MiB/s ETA 00:00
+[download]  46.9% of  127.36MiB at  114.21MiB/s ETA 00:00
+[download]  47.7% of  127.36MiB at  115.80MiB/s ETA 00:00
+[download]  49.3% of  127.36MiB at   21.63MiB/s ETA 00:02
+[download]  52.4% of  127.36MiB at   26.94MiB/s ETA 00:02
+[download]  54.0% of  127.36MiB at   18.36MiB/s ETA 00:03
+[download]  54.0% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  54.0% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  54.0% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  54.0% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  54.0% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  54.0% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  54.1% of  127.36MiB at   62.01MiB/s ETA 00:00  
+[download]  54.2% of  127.36MiB at  124.51MiB/s ETA 00:00
+[download]  54.3% of  127.36MiB at  124.80MiB/s ETA 00:00
+[download]  54.7% of  127.36MiB at  117.49MiB/s ETA 00:00
+[download]  55.5% of  127.36MiB at  119.57MiB/s ETA 00:00
+[download]  57.1% of  127.36MiB at   24.90MiB/s ETA 00:02
+[download]  60.2% of  127.36MiB at   29.24MiB/s ETA 00:01
+[download]  61.5% of  127.36MiB at   19.12MiB/s ETA 00:02
+[download]  61.5% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  61.5% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  61.5% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  61.5% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  61.5% of  127.36MiB at   15.14MiB/s ETA 00:03  
+[download]  61.6% of  127.36MiB at   30.76MiB/s ETA 00:01
+[download]  61.6% of  127.36MiB at   62.02MiB/s ETA 00:00
+[download]  61.7% of  127.36MiB at   83.03MiB/s ETA 00:00
+[download]  61.9% of  127.36MiB at  124.82MiB/s ETA 00:00
+[download]  62.3% of  127.36MiB at  121.46MiB/s ETA 00:00
+[download]  63.1% of  127.36MiB at  115.17MiB/s ETA 00:00
+[download]  64.6% of  127.36MiB at   29.18MiB/s ETA 00:01
+[download]  67.8% of  127.36MiB at   27.93MiB/s ETA 00:01
+[download]  69.2% of  127.36MiB at   15.89MiB/s ETA 00:02
+[download]  69.2% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  69.2% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  69.2% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  69.2% of  127.36MiB at   14.63MiB/s ETA 00:02  
+[download]  69.2% of  127.36MiB at   30.24MiB/s ETA 00:01
+[download]  69.3% of  127.36MiB at   61.45MiB/s ETA 00:00
+[download]  69.3% of  127.36MiB at   62.03MiB/s ETA 00:00
+[download]  69.4% of  127.36MiB at  124.55MiB/s ETA 00:00
+[download]  69.6% of  127.36MiB at   96.06MiB/s ETA 00:00
+[download]  70.0% of  127.36MiB at   89.24MiB/s ETA 00:00
+[download]  70.8% of  127.36MiB at   86.02MiB/s ETA 00:00
+[download]  72.4% of  127.36MiB at   30.94MiB/s ETA 00:01
+[download]  75.5% of  127.36MiB at   27.30MiB/s ETA 00:01
+[download]  76.9% of  127.36MiB at   32.16MiB/s ETA 00:00
+[download]  76.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  76.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  76.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  76.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  76.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  76.9% of  127.36MiB at   30.75MiB/s ETA 00:00  
+[download]  77.0% of  127.36MiB at    1.13MiB/s ETA 00:25
+[download]  77.1% of  127.36MiB at    2.12MiB/s ETA 00:13
+[download]  77.3% of  127.36MiB at    3.72MiB/s ETA 00:07
+[download]  77.7% of  127.36MiB at    5.95MiB/s ETA 00:04
+[download]  78.4% of  127.36MiB at    8.47MiB/s ETA 00:03
+[download]  80.0% of  127.36MiB at   15.43MiB/s ETA 00:01
+[download]  83.2% of  127.36MiB at   15.93MiB/s ETA 00:01
+[download]  84.4% of  127.36MiB at   18.48MiB/s ETA 00:01
+[download]  84.4% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  84.4% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  84.4% of  127.36MiB at    6.76MiB/s ETA 00:02  
+[download]  84.4% of  127.36MiB at   14.49MiB/s ETA 00:01
+[download]  84.5% of  127.36MiB at   13.91MiB/s ETA 00:01
+[download]  84.5% of  127.36MiB at   28.27MiB/s ETA 00:00
+[download]  84.5% of  127.36MiB at   56.99MiB/s ETA 00:00
+[download]  84.6% of  127.36MiB at   78.41MiB/s ETA 00:00
+[download]  84.8% of  127.36MiB at  115.90MiB/s ETA 00:00
+[download]  85.2% of  127.36MiB at  120.29MiB/s ETA 00:00
+[download]  86.0% of  127.36MiB at   71.82MiB/s ETA 00:00
+[download]  87.6% of  127.36MiB at   18.88MiB/s ETA 00:00
+[download]  90.7% of  127.36MiB at   24.33MiB/s ETA 00:00
+[download]  91.9% of  127.36MiB at   19.58MiB/s ETA 00:00
+[download]  91.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  91.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  91.9% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  92.0% of  127.36MiB at    7.34MiB/s ETA 00:01  
+[download]  92.0% of  127.36MiB at   15.16MiB/s ETA 00:00
+[download]  92.0% of  127.36MiB at   30.81MiB/s ETA 00:00
+[download]  92.0% of  127.36MiB at   41.39MiB/s ETA 00:00
+[download]  92.1% of  127.36MiB at   83.10MiB/s ETA 00:00
+[download]  92.3% of  127.36MiB at  110.11MiB/s ETA 00:00
+[download]  92.7% of  127.36MiB at  115.27MiB/s ETA 00:00
+[download]  93.5% of  127.36MiB at   98.81MiB/s ETA 00:00
+[download]  95.1% of  127.36MiB at   43.68MiB/s ETA 00:00
+[download]  98.2% of  127.36MiB at   28.24MiB/s ETA 00:00
+[download]  99.6% of  127.36MiB at   24.54MiB/s ETA 00:00
+[download]  99.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  99.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  99.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  99.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  99.6% of  127.36MiB at  Unknown B/s ETA Unknown
+[download]  99.6% of  127.36MiB at   30.71MiB/s ETA 00:00  
+[download]  99.7% of  127.36MiB at   61.90MiB/s ETA 00:00
+[download]  99.8% of  127.36MiB at  124.28MiB/s ETA 00:00
+[download] 100.0% of  127.36MiB at  136.95MiB/s ETA 00:00
+[download] 100.0% of  127.36MiB at  115.37MiB/s ETA 00:00
+[download] 100% of  127.36MiB in 00:00:06 at 19.41MiB/s  
+[download] Destination: D:\Clipper-Windows\Clipper\work\FmlCcwSlGhw\video.f140-18.m4a
+
+[download]   0.0% of   13.12MiB at  999.36KiB/s ETA 00:13
+[download]   0.0% of   13.12MiB at    1.46MiB/s ETA 00:08
+[download]   0.1% of   13.12MiB at    3.42MiB/s ETA 00:03
+[download]   0.1% of   13.12MiB at    5.84MiB/s ETA 00:02
+[download]   0.2% of   13.12MiB at    5.49MiB/s ETA 00:02
+[download]   0.5% of   13.12MiB at    4.81MiB/s ETA 00:02
+[download]   0.9% of   13.12MiB at    6.60MiB/s ETA 00:02
+[download]   1.9% of   13.12MiB at    9.84MiB/s ETA 00:01
+[download]   3.8% of   13.12MiB at   10.31MiB/s ETA 00:01
+[download]   7.6% of   13.12MiB at    8.75MiB/s ETA 00:01
+[download]  15.2% of   13.12MiB at    8.62MiB/s ETA 00:01
+[download]  30.5% of   13.12MiB at   15.39MiB/s ETA 00:00
+[download]  61.0% of   13.12MiB at   17.18MiB/s ETA 00:00
+[download]  73.3% of   13.12MiB at   14.61MiB/s ETA 00:00
+[download]  73.3% of   13.12MiB at  Unknown B/s ETA Unknown
+[download]  73.3% of   13.12MiB at    1.95MiB/s ETA 00:01  
+[download]  73.3% of   13.12MiB at    4.54MiB/s ETA 00:00
+[download]  73.4% of   13.12MiB at    9.73MiB/s ETA 00:00
+[download]  73.5% of   13.12MiB at   20.12MiB/s ETA 00:00
+[download]  73.7% of   13.12MiB at   24.52MiB/s ETA 00:00
+[download]  74.2% of   13.12MiB at   49.42MiB/s ETA 00:00
+[download]  75.2% of   13.12MiB at   70.91MiB/s ETA 00:00
+[download]  77.1% of   13.12MiB at    8.97MiB/s ETA 00:00
+[download]  80.9% of   13.12MiB at   11.14MiB/s ETA 00:00
+[download]  88.5% of   13.12MiB at   12.70MiB/s ETA 00:00
+[download] 100.0% of   13.12MiB at   14.41MiB/s ETA 00:00
+[download] 100% of   13.12MiB in 00:00:01 at 12.37MiB/s  
+[Merger] Merging formats into "D:\Clipper-Windows\Clipper\work\FmlCcwSlGhw\video.mp4"
+Deleting original file D:\Clipper-Windows\Clipper\work\FmlCcwSlGhw\video.f137.mp4 (pass -k to keep)
+Deleting original file D:\Clipper-Windows\Clipper\work\FmlCcwSlGhw\video.f140-18.m4a (pass -k to keep)
+[clip] transcribe model=medium lang=en
+[clip] whisper on GPU (CUDA)
+[clip] lang=en words=2132
+[clip] heatmap: no
+[clip] render 1/5 370.78-425.71 score=4.52
+[ WARN:0@0.163] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+[clip] render 2/5 271.08-308.52 score=3.83
+[ WARN:0@62.527] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+[clip] render 3/5 0-51.98 score=2.25
+[ WARN:0@114.253] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+[clip] render 4/5 321.67-364.14 score=0.84
+[ WARN:0@170.116] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+[clip] render 5/5 221.49-267.88 score=-0.58
+[ WARN:0@221.260] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+D:\Clipper-Windows\Clipper\Klipy\FmlCcwSlGhw

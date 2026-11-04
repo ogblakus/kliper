@@ -1,0 +1,132 @@
+[clip] download https://www.youtube.com/watch?v=etcYBI7L1D8 client default
+[clip] autosubs en-orig words=3228
+[youtube] Extracting URL: https://www.youtube.com/watch?v=etcYBI7L1D8
+[youtube] etcYBI7L1D8: Downloading webpage
+[youtube] etcYBI7L1D8: Downloading tv samsung player API JSON
+[youtube] etcYBI7L1D8: Downloading visionos player API JSON
+[youtube] etcYBI7L1D8: Downloading player ef321720-main
+[youtube] [jsc:deno] Solving JS challenges using deno
+[youtube] etcYBI7L1D8: Downloading m3u8 information
+[info] etcYBI7L1D8: Downloading 1 format(s): 137+140-11
+[download] Sleeping 5.00 seconds as required by the site...
+[download] Destination: D:\Clipper-Windows\Clipper\work\2026-11-03_Dont_Waste_Your_Life_English_Podcast_for_Easy_Conv__etcYBI7L1D8\video.f137.mp4
+
+[download]   0.0% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]   0.0% of   38.35MiB at    2.93MiB/s ETA 00:13  
+[download]   0.0% of   38.35MiB at    6.83MiB/s ETA 00:05
+[download]   0.0% of   38.35MiB at    7.23MiB/s ETA 00:05
+[download]   0.1% of   38.35MiB at   14.95MiB/s ETA 00:02
+[download]   0.2% of   38.35MiB at   12.31MiB/s ETA 00:03
+[download]   0.3% of   38.35MiB at    5.05MiB/s ETA 00:07
+[download]   0.6% of   38.35MiB at    5.43MiB/s ETA 00:07
+[download]   1.3% of   38.35MiB at    7.22MiB/s ETA 00:05
+[download]   2.6% of   38.35MiB at    9.79MiB/s ETA 00:03
+[download]   5.2% of   38.35MiB at   11.84MiB/s ETA 00:03
+[download]  10.4% of   38.35MiB at   20.40MiB/s ETA 00:01
+[download]  20.9% of   38.35MiB at    8.50MiB/s ETA 00:03
+[download]  24.9% of   38.35MiB at    9.95MiB/s ETA 00:02
+[download]  24.9% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  24.9% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  24.9% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  25.0% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  25.0% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  25.1% of   38.35MiB at   31.23MiB/s ETA 00:00  
+[download]  25.3% of   38.35MiB at   62.95MiB/s ETA 00:00
+[download]  25.6% of   38.35MiB at   83.80MiB/s ETA 00:00
+[download]  26.2% of   38.35MiB at    3.32MiB/s ETA 00:08
+[download]  27.5% of   38.35MiB at    5.41MiB/s ETA 00:05
+[download]  30.1% of   38.35MiB at    7.96MiB/s ETA 00:03
+[download]  35.4% of   38.35MiB at   13.17MiB/s ETA 00:01
+[download]  45.8% of   38.35MiB at   12.82MiB/s ETA 00:01
+[download]  50.6% of   38.35MiB at   10.04MiB/s ETA 00:01
+[download]  50.6% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  50.6% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  50.6% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  50.6% of   38.35MiB at   14.56MiB/s ETA 00:01  
+[download]  50.7% of   38.35MiB at   30.08MiB/s ETA 00:00
+[download]  50.7% of   38.35MiB at   61.13MiB/s ETA 00:00
+[download]  50.9% of   38.35MiB at   61.83MiB/s ETA 00:00
+[download]  51.2% of   38.35MiB at   82.85MiB/s ETA 00:00
+[download]  51.9% of   38.35MiB at   77.15MiB/s ETA 00:00
+[download]  53.2% of   38.35MiB at    5.46MiB/s ETA 00:03
+[download]  55.8% of   38.35MiB at    7.98MiB/s ETA 00:02
+[download]  61.0% of   38.35MiB at   11.80MiB/s ETA 00:01
+[download]  71.4% of   38.35MiB at   11.42MiB/s ETA 00:00
+[download]  75.8% of   38.35MiB at    9.47MiB/s ETA 00:00
+[download]  75.8% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  75.9% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  75.9% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  75.9% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  75.9% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  76.0% of   38.35MiB at  Unknown B/s ETA Unknown
+[download]  76.2% of   38.35MiB at   62.02MiB/s ETA 00:00  
+[download]  76.5% of   38.35MiB at  124.54MiB/s ETA 00:00
+[download]  77.1% of   38.35MiB at   85.56MiB/s ETA 00:00
+[download]  78.5% of   38.35MiB at   26.13MiB/s ETA 00:00
+[download]  81.1% of   38.35MiB at   18.81MiB/s ETA 00:00
+[download]  86.3% of   38.35MiB at   16.14MiB/s ETA 00:00
+[download]  96.7% of   38.35MiB at    4.37MiB/s ETA 00:00
+[download] 100.0% of   38.35MiB at    4.06MiB/s ETA 00:00
+[download] 100% of   38.35MiB in 00:00:05 at 6.88MiB/s   
+[download] Destination: D:\Clipper-Windows\Clipper\work\2026-11-03_Dont_Waste_Your_Life_English_Podcast_for_Easy_Conv__etcYBI7L1D8\video.f140-11.m4a
+
+[download]   0.0% of   20.34MiB at  Unknown B/s ETA Unknown
+[download]   0.0% of   20.34MiB at  Unknown B/s ETA Unknown
+[download]   0.0% of   20.34MiB at  Unknown B/s ETA Unknown
+[download]   0.1% of   20.34MiB at  Unknown B/s ETA Unknown
+[download]   0.1% of   20.34MiB at   15.11MiB/s ETA 00:01  
+[download]   0.3% of   20.34MiB at   30.71MiB/s ETA 00:00
+[download]   0.6% of   20.34MiB at   30.77MiB/s ETA 00:00
+[download]   1.2% of   20.34MiB at   19.15MiB/s ETA 00:01
+[download]   2.5% of   20.34MiB at   17.13MiB/s ETA 00:01
+[download]   4.9% of   20.34MiB at   15.77MiB/s ETA 00:01
+[download]   9.8% of   20.34MiB at   15.25MiB/s ETA 00:01
+[download]  19.7% of   20.34MiB at   25.40MiB/s ETA 00:00
+[download]  39.3% of   20.34MiB at   10.05MiB/s ETA 00:01
+[download]  47.8% of   20.34MiB at   10.60MiB/s ETA 00:01
+[download]  47.8% of   20.34MiB at  Unknown B/s ETA Unknown
+[download]  47.9% of   20.34MiB at  Unknown B/s ETA Unknown
+[download]  47.9% of   20.34MiB at  Unknown B/s ETA Unknown
+[download]  47.9% of   20.34MiB at  Unknown B/s ETA Unknown
+[download]  48.0% of   20.34MiB at   15.14MiB/s ETA 00:00  
+[download]  48.1% of   20.34MiB at   30.77MiB/s ETA 00:00
+[download]  48.4% of   20.34MiB at   62.03MiB/s ETA 00:00
+[download]  49.1% of   20.34MiB at   83.03MiB/s ETA 00:00
+[download]  50.3% of   20.34MiB at    3.68MiB/s ETA 00:02
+[download]  52.8% of   20.34MiB at    5.91MiB/s ETA 00:01
+[download]  57.7% of   20.34MiB at    8.46MiB/s ETA 00:01
+[download]  67.5% of   20.34MiB at   10.64MiB/s ETA 00:00
+[download]  87.2% of   20.34MiB at   10.22MiB/s ETA 00:00
+[download]  94.6% of   20.34MiB at    9.04MiB/s ETA 00:00
+[download]  94.6% of   20.34MiB at  Unknown B/s ETA Unknown
+[download]  94.7% of   20.34MiB at    2.93MiB/s ETA 00:00  
+[download]  94.7% of   20.34MiB at    6.83MiB/s ETA 00:00
+[download]  94.7% of   20.34MiB at   14.64MiB/s ETA 00:00
+[download]  94.8% of   20.34MiB at   15.14MiB/s ETA 00:00
+[download]  94.9% of   20.34MiB at   30.76MiB/s ETA 00:00
+[download]  95.2% of   20.34MiB at   62.02MiB/s ETA 00:00
+[download]  95.9% of   20.34MiB at   82.18MiB/s ETA 00:00
+[download]  97.1% of   20.34MiB at   70.96MiB/s ETA 00:00
+[download]  99.6% of   20.34MiB at   14.23MiB/s ETA 00:00
+[download] 100.0% of   20.34MiB at   14.39MiB/s ETA 00:00
+[download] 100% of   20.34MiB in 00:00:02 at 8.32MiB/s   
+[Merger] Merging formats into "D:\Clipper-Windows\Clipper\work\2026-11-03_Dont_Waste_Your_Life_English_Podcast_for_Easy_Conv__etcYBI7L1D8\video.mp4"
+Deleting original file D:\Clipper-Windows\Clipper\work\2026-11-03_Dont_Waste_Your_Life_English_Podcast_for_Easy_Conv__etcYBI7L1D8\video.f137.mp4 (pass -k to keep)
+Deleting original file D:\Clipper-Windows\Clipper\work\2026-11-03_Dont_Waste_Your_Life_English_Podcast_for_Easy_Conv__etcYBI7L1D8\video.f140-11.m4a (pass -k to keep)
+[clip] preset=zbalansowany tier=gpu model=medium beam=2 hw={'cores': 12, 'ram_gb': 15.9, 'gpu': 'NVIDIA GeForce RTX 3050 (8 GB)', 'tier': 'gpu'}
+[clip] fast path: YouTube subtitles + Whisper only on 8 candidate regions
+[clip] transcribe model=medium lang=en beam=2 regions=8 (7.0 min)
+[clip] whisper on GPU (CUDA float16)
+[clip] lang=en words=2505
+[clip] heatmap: yes
+[clip] render 1/5 34.6-63.72 score=8.12
+[clip] render 2/5 317.8-352.88 score=6.31
+[ WARN:1@0.068] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+[ WARN:0@0.071] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+[clip] render 3/5 129.92-156.2 score=6.07
+[ WARN:1@33.564] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+[clip] render 4/5 813.22-842.17 score=-0.06
+[ WARN:0@35.960] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+[clip] render 5/5 588.78-636.61 score=-0.7
+[ WARN:1@62.776] global net_impl_backend.cpp:345 cv::dnn::dnn5_v20260605::Net::Impl::setPreferableTarget Targets are not supported by the new graph engine for now
+D:\Clipper-Windows\Clipper\Klipy\2026-11-03_Dont_Waste_Your_Life_English_Podcast_for_Easy_Conv__etcYBI7L1D8

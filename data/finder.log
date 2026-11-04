@@ -1,0 +1,118 @@
+2026-10-25 01:53:39 search ['podcast wywiad', 'rozmowa podcast gość'] pl 7 False
+2026-10-25 01:53:41 FAIL rc 1 --playlist-end 12 https://www.youtube.com/results?search_query=rozmowa+podcast+go%C5%9B%C4%87&sp=EgYIAxABGAM%3D | ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+2026-10-25 01:53:41 FAIL rc 1 --playlist-end 30 https://www.youtube.com/results?search_query=rozmowa+podcast+go%C5%9B%C4%87&sp=EgYIAxABGAI%3D | ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+2026-10-25 01:53:41 FAIL rc 1 --playlist-end 30 https://www.youtube.com/results?search_query=podcast+wywiad&sp=EgYIAxABGAI%3D | ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+2026-10-25 01:53:41 FAIL rc 1 --playlist-end 12 https://www.youtube.com/results?search_query=podcast+wywiad&sp=EgYIAxABGAM%3D | ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+2026-10-25 01:53:42 FAIL rc 1 --flat-playlist -J ytsearch30:podcast wywiad | ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+2026-10-25 01:53:42 flat q='podcast wywiad' dur=2 -> 0
+2026-10-25 01:53:42 FAIL rc 1 --flat-playlist -J ytsearch30:rozmowa podcast gość | ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+2026-10-25 01:53:42 flat q='rozmowa podcast gość' dur=2 -> 0
+2026-10-25 01:53:42 FAIL rc 1 --flat-playlist -J ytsearch12:podcast wywiad | ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+2026-10-25 01:53:42 FAIL rc 1 --flat-playlist -J ytsearch12:rozmowa podcast gość | ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+2026-10-25 01:53:42 flat q='podcast wywiad' dur=3 -> 0
+2026-10-25 01:53:42 flat q='rozmowa podcast gość' dur=3 -> 0
+2026-10-25 01:53:42 done found=0 deep=0 results=0 errors=4 in 3.3s
+2026-10-25 01:54:14 FAIL rc 1 --flat-playlist -J ytsearch3:podcast wywiad | ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+ERROR: Could not copy Chrome cookie database. See  https://github.com/yt-dlp/yt-dlp/issues/7271  for more info
+2026-10-25 01:54:14 diagnose [('yt-dlp', True, '2026.10.21'), ('ffmpeg', True, 'ffmpeg version N-128013-g6b05263b44-20261024 Copyright (c) 2000-2026 the FFmpeg developers'), ('deno', True, 'deno 2.9.8 (stable, release, x86_64-pc-windows-msvc)'), ('Wyszukiwanie YouTube', False, 'Nie udało się odczytać ciasteczek z przeglądarki (Chrome/Brave/Edge blokują je, gdy są otwarte). Użyj pliku cookies.txt (Ustawienia) albo wyłącz ciasteczka z przeglądarki.'), ('Szczegóły filmu / pobieranie', False, 'brak filmu do sprawdzenia'), ('Ciasteczka', True, 'z przeglądarki: brave'), ('Python', True, '3.12.15 · D:\\Clipper-Windows\\Clipper\\.venv\\Scripts\\python.exe')]
+2026-10-25 01:54:36 search ['podcast wywiad', 'rozmowa podcast gość'] pl 7 False
+2026-10-25 01:54:39 flat q='podcast wywiad' dur=3 -> 12
+2026-10-25 01:54:39 flat q='rozmowa podcast gość' dur=3 -> 12
+2026-10-25 01:54:40 flat q='rozmowa podcast gość' dur=2 -> 30
+2026-10-25 01:54:41 flat q='podcast wywiad' dur=2 -> 30
+2026-10-25 01:54:59 done found=79 deep=15 results=14 errors=0 in 22.9s
+2026-10-25 08:56:18 search ['sport wywiad podcast', 'piłka nożna rozmowa'] pl 7 False
+2026-10-25 08:56:21 flat q='piłka nożna rozmowa' dur=3 -> 12
+2026-10-25 08:56:21 flat q='sport wywiad podcast' dur=3 -> 12
+2026-10-25 08:56:22 flat q='sport wywiad podcast' dur=2 -> 30
+2026-10-25 08:56:22 flat q='piłka nożna rozmowa' dur=2 -> 30
+2026-10-25 08:56:37 done found=81 deep=15 results=12 errors=0 in 18.9s
+2026-10-25 08:57:06 search ['sztuczna inteligencja AI rozmowa', 'technologia podcast'] pl 7 False
+2026-10-25 08:57:07 flat q='technologia podcast' dur=3 -> 12
+2026-10-25 08:57:08 flat q='sztuczna inteligencja AI rozmowa' dur=3 -> 12
+2026-10-25 08:57:08 flat q='technologia podcast' dur=2 -> 30
+2026-10-25 08:57:08 flat q='sztuczna inteligencja AI rozmowa' dur=2 -> 30
+2026-10-25 08:57:19 done found=82 deep=15 results=15 errors=0 in 13.3s
+2026-10-25 08:58:53 search ['sztuczna inteligencja AI rozmowa', 'technologia podcast'] pl 7 True
+2026-10-25 08:58:55 flat q='technologia podcast' dur=3 -> 12
+2026-10-25 08:58:55 flat q='technologia podcast' dur=2 -> 30
+2026-10-25 08:58:55 flat q='sztuczna inteligencja AI rozmowa' dur=3 -> 7
+2026-10-25 08:58:56 flat q='sztuczna inteligencja AI rozmowa' dur=2 -> 12
+2026-10-25 08:59:11 done found=55 deep=15 results=0 errors=0 in 17.3s
+2026-10-25 08:59:19 search ['true crime po polsku', 'kryminalna historia sprawa'] pl 30 True
+2026-10-25 08:59:21 flat q='true crime po polsku' dur=2 -> 3
+2026-10-25 08:59:21 flat q='kryminalna historia sprawa' dur=2 -> 10
+2026-10-25 08:59:21 flat q='true crime po polsku' dur=3 -> 3
+2026-10-25 08:59:21 flat q='kryminalna historia sprawa' dur=3 -> 12
+2026-10-25 08:59:34 done found=24 deep=15 results=0 errors=0 in 14.8s
+2026-11-02 19:59:22 search ['podcast wywiad', 'rozmowa podcast gość'] pl 7 False
+2026-11-02 19:59:27 flat q='rozmowa podcast gość' dur=3 -> 12
+2026-11-02 19:59:27 flat q='podcast wywiad' dur=3 -> 12
+2026-11-02 19:59:27 flat q='rozmowa podcast gość' dur=2 -> 30
+2026-11-02 19:59:28 flat q='podcast wywiad' dur=2 -> 30
+2026-11-02 19:59:45 done found=76 deep=15 results=14 errors=0 in 22.7s
+2026-11-02 20:16:55 search ['stand-up podcast śmieszne', 'kabaret rozmowa komik'] pl 7 False
+2026-11-02 20:16:57 flat q='stand-up podcast śmieszne' dur=3 -> 12
+2026-11-02 20:16:58 flat q='kabaret rozmowa komik' dur=3 -> 6
+2026-11-02 20:16:58 flat q='stand-up podcast śmieszne' dur=2 -> 30
+2026-11-02 20:16:58 flat q='kabaret rozmowa komik' dur=2 -> 15
+2026-11-02 20:17:12 done found=59 deep=15 results=7 errors=0 in 16.6s
+2026-11-02 20:28:19 diagnose [('yt-dlp', True, '2026.10.26'), ('ffmpeg', True, 'ffmpeg version N-128013-g6b05263b44-20261024 Copyright (c) 2000-2026 the FFmpeg developers'), ('deno', True, 'deno 2.9.8 (stable, release, x86_64-pc-windows-msvc)'), ('Wyszukiwanie YouTube', True, '3 wyników: PEJA: DZISIEJSZY RAP? Sorry, ale jest du; Jennifer Lawrence: Igrzyska śmierci, gor; Capcore podcast No. 28 Dziki, Nafas and '), ('Szczegóły filmu / pobieranie', True, 'PEJA: DZISIEJSZY RAP? Sorry, ale jest dużo g*wna!  · 3416 wyśw. · 2.1 s'), ('Ciasteczka', True, 'plik cookies.txt'), ('Python', True, '3.12.15 · D:\\Clipper-Windows\\Clipper\\.venv\\Scripts\\python.exe')]
+2026-11-02 21:42:04 search ['podcast wywiad', 'rozmowa podcast gość'] pl 7 False
+2026-11-02 21:42:05 flat q='rozmowa podcast gość' dur=3 -> 12
+2026-11-02 21:42:05 flat q='podcast wywiad' dur=3 -> 12
+2026-11-02 21:42:06 flat q='rozmowa podcast gość' dur=2 -> 30
+2026-11-02 21:42:06 flat q='podcast wywiad' dur=2 -> 30
+2026-11-02 21:42:20 done found=31 deep=15 results=11 errors=0 in 16.1s
+2026-11-02 21:48:55 search ['podcast wywiad', 'rozmowa podcast gość'] pl 7 True
+2026-11-02 21:48:58 flat q='podcast wywiad' dur=3 -> 12
+2026-11-02 21:48:58 flat q='rozmowa podcast gość' dur=3 -> 1
+2026-11-02 21:48:58 flat q='rozmowa podcast gość' dur=2 -> 17
+2026-11-02 21:48:59 flat q='podcast wywiad' dur=2 -> 30
+2026-11-02 21:49:14 done found=10 deep=10 results=0 errors=0 in 18.9s
+2026-11-03 19:55:46 search ['podcast wywiad', 'rozmowa podcast gość'] pl 7 False
+2026-11-03 19:55:49 flat q='podcast wywiad' dur=3 -> 12
+2026-11-03 19:55:49 flat q='rozmowa podcast gość' dur=3 -> 12
+2026-11-03 19:55:50 flat q='rozmowa podcast gość' dur=2 -> 30
+2026-11-03 19:55:50 flat q='podcast wywiad' dur=2 -> 30
+2026-11-03 19:56:13 done found=29 deep=15 results=13 errors=0 in 27.5s
+2026-11-03 20:04:44 search ['podcast interview full episode', 'long form conversation podcast', 'podcast clips viral guest story'] en 365 False
+2026-11-03 20:04:46 flat q='podcast interview full episode' dur=3 -> 12
+2026-11-03 20:04:46 flat q='podcast clips viral guest story' dur=2 -> 7
+2026-11-03 20:04:47 flat q='long form conversation podcast' dur=2 -> 30
+2026-11-03 20:04:47 flat q='podcast interview full episode' dur=2 -> 30
+2026-11-03 20:04:47 flat q='long form conversation podcast' dur=3 -> 12
+2026-11-03 20:04:48 flat q='podcast clips viral guest story' dur=3 -> 5
+2026-11-03 20:05:02 done found=75 deep=15 results=10 errors=0 in 17.5s
+2026-11-03 20:18:08 search ['podcast interview full episode', 'long form conversation podcast', 'podcast clips viral guest story'] en 365 False
+2026-11-03 20:18:11 flat q='podcast interview full episode' dur=3 -> 12
+2026-11-03 20:18:11 flat q='podcast clips viral guest story' dur=2 -> 7
+2026-11-03 20:18:12 flat q='long form conversation podcast' dur=2 -> 30
+2026-11-03 20:18:12 flat q='podcast interview full episode' dur=2 -> 30
+2026-11-03 20:18:13 flat q='long form conversation podcast' dur=3 -> 12
+2026-11-03 20:18:14 flat q='podcast clips viral guest story' dur=3 -> 5
+2026-11-03 20:18:28 done found=43 deep=15 results=7 errors=0 in 20.2s
+2026-11-03 20:18:55 search ['motivation podcast', 'mindset discipline interview'] en 365 False
+2026-11-03 20:18:56 flat q='mindset discipline interview' dur=3 -> 12
+2026-11-03 20:18:56 flat q='motivation podcast' dur=3 -> 12
+2026-11-03 20:18:57 flat q='motivation podcast' dur=2 -> 30
+2026-11-03 20:18:57 flat q='mindset discipline interview' dur=2 -> 30
+2026-11-03 20:19:10 done found=46 deep=15 results=10 errors=0 in 15.7s
+2026-11-03 20:56:33 search ['stand-up podcast śmieszne', 'kabaret rozmowa komik'] pl 30 False
+2026-11-03 20:56:34 flat q='kabaret rozmowa komik' dur=3 -> 12
+2026-11-03 20:56:34 flat q='stand-up podcast śmieszne' dur=3 -> 12
+2026-11-03 20:56:35 flat q='stand-up podcast śmieszne' dur=2 -> 30
+2026-11-03 20:56:36 flat q='kabaret rozmowa komik' dur=2 -> 22
+2026-11-03 20:56:50 done found=60 deep=15 results=13 errors=0 in 17.2s
+2026-11-03 21:02:19 search ['hamburger show'] pl 30 False
+2026-11-03 21:02:20 flat q='hamburger show' dur=3 -> 12
+2026-11-03 21:02:21 flat q='hamburger show' dur=2 -> 30
+2026-11-03 21:02:35 done found=19 deep=15 results=6 errors=0 in 16.2s
