@@ -1,0 +1,39 @@
+﻿CLIPPER – shorty z YouTube na Twoim komputerze (za darmo)
+
+1. Rozpakuj ZIP do krótkiego folderu, najlepiej C:\Clipper (nie na Pulpit w OneDrive).
+2. Kliknij dwa razy „Uruchom Clipper.bat”. Jeśli Windows pokaże „System Windows ochronił komputer”,
+   kliknij „Więcej informacji” → „Uruchom mimo to”.
+3. Za pierwszym razem program sam pobierze potrzebne rzeczy (ok. 1–2 GB, 5–15 minut). Poczekaj.
+4. Otworzy się przeglądarka z adresem http://localhost:8765. Wklej link do filmu lub użyj zakładki „Znajdź film”.
+   Gotowe klipy są w folderze „Klipy” (przycisk „📂 Otwórz folder z klipami” w Ustawieniach).
+5. Czarne okno musi być otwarte, dopóki używasz Clippera. Zamknięcie okna = wyłączenie programu.
+
+Pierwszy film trwa dłużej: model rozpoznawania mowy (150–500 MB) pobiera się raz.
+Szybkość (Ustawienia → „Jakość / szybkość”). Clipper sam wykrywa procesor, RAM i kartę NVIDIA:
+   ⚡ Szybki      – domyślny na komputerach bez karty NVIDIA. Napisy YouTube + Whisper tylko na wybranych fragmentach.
+   ⚖️ Zbalansowany – lepsze napisy (model small), nadal szybki.
+   🎯 Dokładny    – cały film modelem medium – wolny bez NVIDIA (film 30 min ≈ 15–30 min).
+   Przykład (8 wątków, bez GPU, film 15 min, 5 klipów): Szybki ≈ 1,5 min, Zbalansowany ≈ 1,5 min (wcześniej ≈ 6,5 min).
+   Szacowany czas dla Twojego komputera widać w Ustawieniach. Ciężka praca idzie z niskim priorytetem – komputer nie „zamula”.
+
+Gdy YouTube prosi o zalogowanie („bot-check”, „Sign in to confirm you're not a bot”) – plik cookies.txt:
+   1) W Brave/Chrome otwórz Chrome Web Store i zainstaluj darmowe rozszerzenie „Get cookies.txt LOCALLY”.
+   2) Wejdź na youtube.com i upewnij się, że jesteś zalogowany.
+   3) Kliknij ikonę rozszerzenia (puzzel → Get cookies.txt LOCALLY) → „Export” (format Netscape).
+      Zapisze się plik youtube.com_cookies.txt (w Pobranych).
+   4) W Clipperze: Ustawienia → „Plik cookies.txt” → wybierz ten plik → „Wgraj cookies.txt”.
+   5) Ustaw „Ciasteczka YouTube z przeglądarki” na „wyłączone” i spróbuj ponownie.
+   Plik ważny zwykle kilka tygodni – gdy błąd wróci, wyeksportuj i wgraj ponownie.
+   Nie wysyłaj nikomu pliku cookies.txt (to jak hasło do konta YouTube).
+   Ustawienia → „🩺 Diagnostyka” pokazuje, co działa; zrzut ekranu można wysłać do pomocy.
+
+Aktualizacja:
+   - yt-dlp (pobieranie z YouTube) aktualizuje się sam przy każdym uruchomieniu.
+   - Nowa wersja Clippera: zamknij czarne okno Clippera, rozpakuj nowy ZIP w to samo miejsce
+     (np. C:\ – powstanie/zostanie nadpisany folder C:\Clipper) i zgódź się na zastąpienie plików. Uruchom „Uruchom Clipper.bat”.
+     Twoje klipy (Klipy), ustawienia (data) i zainstalowane narzędzia (tools, .venv) zostaną.
+   - Gdyby coś się zepsuło: usuń folder „.venv” i uruchom ponownie (zainstaluje się od nowa).
+
+Problemy: log jest w data\start.log oraz data\logs.
+Nisze „Skróty filmów/seriali”, „Bajki dla dzieci”, „Edukacyjne dla dzieci” to zwykle materiały chronione – odpowiadasz za prawa.
+Pamiętaj: klipowanie cudzych filmów bez zgody autora może skończyć się roszczeniem praw autorskich.
