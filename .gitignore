@@ -1,0 +1,11 @@
+# YouTube cookie exports (account access) — any folder, including data/cookies.txt
+www.youtube.com_cookies.txt
+*cookies*.txt
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Local runtime data. Files already tracked stay tracked until explicitly untracked.
+data/

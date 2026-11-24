@@ -117,8 +117,8 @@ PAGE = f"""<!doctype html><html lang=pl><meta name=viewport content="width=devic
 <label>Nisza</label><select name=preset>__PRESETS__</select>
 <div class=row><div><label>Język</label><select name=lang><option value=pl>polski</option><option value=en>angielski</option></select></div>
 <div><label>Wiek filmu</label><select name=age><option value=7>ostatnie 7 dni</option><option value=30>ostatnie 30 dni</option><option value=365>ostatni rok</option></select></div></div>
-<label>Minimum wyświetleń: <b id=mvl>100 tys.</b></label><input type=range id=mvr min=0 max=7 step=0.25 value=5 oninput=mvU() style="padding:0">
-<input type=hidden name=min_views id=mv value=100000><p class=st style="margin:2px 0">Suwak logarytmiczny 0 – 10 mln. Mniejsze filmy rzadko dają viralowe klipy.</p>
+<label>Minimum wyświetleń: <b id=mvl>20 tys.</b></label><input type=range id=mvr min=0 max=7 step=0.1 value=4.3 oninput=mvU() style="padding:0">
+<input type=hidden name=min_views id=mv value=20000><p class=st style="margin:2px 0">Suwak logarytmiczny 0 – 10 mln. Mniejsze filmy rzadko dają viralowe klipy.</p>
 <label class=chk><input type=checkbox name=cc value=1> tylko Creative Commons (bezpieczne)</label>
 <button id=fb>Szukaj 🔎</button><p class=st>Szukanie trwa zwykle 15–60 s (sprawdzam szczegóły ~15 najlepszych kandydatów). Wyniki są zapamiętywane na 6 h.</p>
 <p class=warn>⚠️ Klipowanie cudzych filmów bez zgody autora może skończyć się roszczeniem lub ostrzeżeniem o naruszeniu praw autorskich (copyright strike). Najbezpieczniej: filmy z licencją Creative Commons (🟢 CC) albo za zgodą twórcy.</p></form>
@@ -223,7 +223,7 @@ def api_diag(r: Request):
     need(r); os.environ.update(child_env()); return finder.diagnose()
 
 @app.post("/api/find")
-def api_find(r: Request, topic: str = Form(""), preset: str = Form("podcasty"), lang: str = Form("pl"), age: int = Form(7), cc: str = Form(""), min_views: int = Form(100000)):
+def api_find(r: Request, topic: str = Form(""), preset: str = Form("podcasty"), lang: str = Form("pl"), age: int = Form(7), cc: str = Form(""), min_views: int = Form(20000)):
     need(r)
     os.environ.update(child_env())
     try: return {**finder.search(topic[:120], preset, lang, age, bool(cc), min_views=min_views),

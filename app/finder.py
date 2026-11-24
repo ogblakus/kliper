@@ -115,13 +115,28 @@ def _deep(vid):
     ERRORS.append(explain(last) if (BOT["hit"] or "cookies" in last.lower()) else f"Szczegóły {vid}: {explain(last)}")
     return None
 
-def _pre(e):
+def _flat_days(e):
+    """Days since upload from flat search data, or None when that entry has no date."""
+    ts = e.get("timestamp")
+    try: ts = float(ts)
+    except (TypeError, ValueError): ts = 0
+    if ts > 0: return max((time.time() - ts) / 86400, 0.3)
+    ud = str(e.get("upload_date") or "")
+    if len(ud) == 8 and ud.isdigit():
+        try: return max((time.time() - time.mktime(time.strptime(ud, "%Y%m%d"))) / 86400, 0.3)
+        except (OverflowError, ValueError): return None
+    return None
+
+def _pre(e, age=7):
     v = e.get("view_count"); d = e.get("duration") or 0
     s = math.log10(v + 10) if v is not None else 6 - 0.1 * e.get("_rank", 30)
     if 600 <= d <= 7200: s += 1.5
     elif d > 7200: s += 0.3
     if LONGFORM.search(e.get("title") or ""): s += 0.8
     if HL["v"] == "pl" and not PLW.search(e.get("title") or ""): s -= 3  # prefer Polish titles for PL search
+    days = _flat_days(e)
+    if days is not None:  # same curve as _score; weight stays under the PL-title penalty so fresh videos can enter the top 15
+        s += _lin(-days, -float(age), -0.3) * 3
     return s
 
 def _fmt(n):
@@ -132,14 +147,15 @@ def _lin(x, lo, hi): return max(0.0, min((x - lo) / (hi - lo), 1.0))
 def _t(sec): sec = int(sec); return f"{sec//3600}:{sec%3600//60:02d}:{sec%60:02d}" if sec >= 3600 else f"{sec//60}:{sec%60:02d}"
 
 def _score(d, age):
-    """0–100. Big, fast-growing, engaging videos first; tiny videos are penalised (not surfaced)."""
+    """0–100. What's growing now: fresher, faster-growing videos rank above big older hits. Tiny videos are penalised."""
     now = time.time(); ts = d.get("timestamp") or (time.mktime(time.strptime(d["upload_date"], "%Y%m%d")) if d.get("upload_date") else now - 86400 * age)
     days = max((now - ts) / 86400, 0.3); v = d.get("view_count") or 0; dur = d.get("duration") or 0
     subs = d.get("channel_follower_count") or 0; likes = d.get("like_count") or 0; com = d.get("comment_count") or 0
     if subs and subs < 2000 and v > 100 * subs: subs = 0  # yt-dlp sometimes returns a bogus tiny follower count
     vpd = v / days; lr = likes / v if v else 0; cr = com / v if v else 0; out = v / subs if subs else 0
-    s_reach = _lin(math.log10(v + 1), 3.5, 6.5) * 25          # 3k -> 0, 3 mln -> max
-    s_vel = _lin(math.log10(vpd + 1), 2.5, 5.3) * 20          # 300/day -> 0, 200k/day -> max
+    s_reach = _lin(math.log10(v + 1), 3.5, 6.5) * 10          # 3k -> 0, 3 mln -> max
+    s_vel = _lin(math.log10(vpd + 1), 2.5, 5.3) * 30          # 300/day -> 0, 200k/day -> max
+    s_fresh = _lin(-days, -float(age), -0.3) * 15            # newer inside the selected age window -> more
     s_out = _lin(out, 0.05, 1.5) * 15 if subs else 5           # views vs channel size
     s_eng = _lin(lr, 0.008, 0.05) * 10 + (_lin(cr, 0.0005, 0.005) * 5 if v >= 1000 else 0)
     if 1200 <= dur <= 7200: s_len = 12
@@ -158,7 +174,7 @@ def _score(d, age):
             if t > 20 and all(abs(t - p) > 60 for p in peaks): peaks.append(t)
             if len(peaks) == 3: break
         peaks.sort()
-    score = s_reach + s_vel + s_out + s_eng + s_len + s_hm
+    score = s_reach + s_vel + s_fresh + s_out + s_eng + s_len + s_hm
     if v < 10000: score *= 0.6  # tiny videos rarely produce viral clips
     cc = (d.get("license") or "").lower().startswith("creative commons")
     nclips = max(1, min(10, int(dur / 420) + (len(peaks) if ratio > 1.8 else 0)))
@@ -166,6 +182,7 @@ def _score(d, age):
     # short reasons (max 3) + compact stat rows for the hover/tap popup
     why = []
     if vpd >= 5000: why.append(f"szybko rośnie: {_fmt(vpd)} wyświetleń dziennie")
+    if s_fresh >= 7.5: why.append(f"świeży: opublikowany {days:.1f} dni temu")
     if subs and out >= 0.8 and v >= 10000: why.append(f"{out:.1f}× więcej wyświetleń niż subskrypcji – temat chwycił")
     if ratio > 1.8 and peaks: why.append("widzowie wracają do: " + ", ".join(_t(p) for p in peaks))
     if lr >= 0.04: why.append(f"bardzo dobre polubienia ({100*lr:.1f}%)")
@@ -194,7 +211,7 @@ def _load():
     try: return json.loads(CACHE_F.read_text(encoding="utf-8"))
     except Exception: return {}
 
-def search(topic="", preset="", lang="pl", age=7, cc=False, top=15, min_views=100000):
+def search(topic="", preset="", lang="pl", age=7, cc=False, top=15, min_views=20000):
     lang = "en" if lang == "en" else "pl"; age = 7 if int(age) <= 7 else (30 if int(age) <= 30 else 365)
     mv = max(0, int(min_views or 0))
     queries = [topic.strip()] if topic.strip() else PRESETS.get(preset, PRESETS["podcasty"])[lang]
@@ -209,7 +226,7 @@ def search(topic="", preset="", lang="pl", age=7, cc=False, top=15, min_views=10
         for e in L:
             if e.get("id") and e["id"] not in seen and (e.get("duration") or 0) >= 300 \
                and (e.get("view_count") is None or e["view_count"] >= mv * 0.7): seen[e["id"]] = e  # min views (flat counts are approximate)
-    cands = sorted(seen.values(), key=_pre, reverse=True)[:top]
+    cands = sorted(seen.values(), key=lambda e: _pre(e, age), reverse=True)[:top]
     with ThreadPoolExecutor(6 if (os.cpu_count() or 4) >= 8 else 3) as ex: dl = list(ex.map(lambda e: _deep(e["id"]), cands))
     for e, d in zip(cands, dl):  # keep original search title (detail fetch may return auto-translated titles)
         if d and e.get("title") and not d.get("title"): d["title"] = e["title"]  # deep uses hl=<search lang> -> original titles
