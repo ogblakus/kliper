@@ -315,11 +315,13 @@ def clip_get(r: Request, vid: str, n: int):
     if not 1 <= n <= len(sm["clips"]): raise HTTPException(404)
     c = sm["clips"][n - 1]; ed = c.get("edits", {}).get("words", {})
     words = json.loads((WORK / vid / f"transcript_{sm['whisper_model']}.json").read_text(encoding="utf-8"))["words"]
+    from main import keep_intervals, src_to_out
+    iv = keep_intervals(words, c["start"], c["end"])
     ws = []
     for w in words:
         if w["s"] >= c["start"] - 0.01 and w["e"] <= c["end"] + 0.01:
             k = f"{w['s']:.3f}"; e = ed.get(k, {})
-            ws.append({"k": k, "t": round(w["s"] - c["start"], 2), "orig": w["w"], "w": e.get("w", w["w"]), "del": bool(e.get("del")), "p": w.get("p", 1),
+            ws.append({"k": k, "t": round(src_to_out(w["s"], iv), 2), "orig": w["w"], "w": e.get("w", w["w"]), "del": bool(e.get("del")), "p": w.get("p", 1),
                        "sug": w.get("sug"), "asr": w.get("asr")})
     if sm.get("language") == "pl" and not any(x.get("sug") or x.get("asr") for x in ws):  # older clips: suggestions only, no auto-fix
         try:

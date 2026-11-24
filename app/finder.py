@@ -11,7 +11,7 @@ _lock = threading.Lock()
 
 # clip: suggested clip length (s); rights: copyrighted film/cartoon material -> show notice in UI
 PRESETS = {
-    "podcasty": {"label": "Podcasty PL", "pl": ["podcast wywiad", "rozmowa podcast gość"], "en": ["podcast interview", "podcast episode guest"]},
+    "podcasty": {"label": "Podcasty", "pl": ["podcast wywiad", "rozmowa podcast gość"], "en": ["podcast interview", "podcast episode guest"]},
     "podcast_en": {"label": "Podcast angielski", "lang": "en", "pl": ["podcast interview", "podcast episode guest"], "en": ["podcast interview full episode", "long form conversation podcast", "podcast clips viral guest story"]},
     "tworcy": {"label": "Twórcy (YouTuberzy, influencerzy)", "pl": ["youtuber wywiad", "twórca internetowy rozmowa", "influencer podcast szczerze"], "en": ["youtuber interview", "content creator podcast", "creator economy interview"]},
     "motywacja": {"label": "Motywacja", "pl": ["motywacja rozwój osobisty podcast", "mindset wywiad"], "en": ["motivation podcast", "mindset discipline interview"]},

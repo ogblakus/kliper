@@ -4,6 +4,7 @@ const S=(()=>{try{return JSON.parse(localStorage.jobOpen||'{}')}catch(e){return 
 let JOBS={},ORDER=[],timer=null;
 function cp(b,t){navigator.clipboard.writeText(t).then(()=>{const o=b.textContent;b.textContent='Skopiowano ✓';setTimeout(()=>b.textContent=o,1500)}).catch(()=>{prompt('Skopiuj:',t)})}
 const fmtT=s=>{s=Math.max(0,Math.round(s));return s>=60?Math.floor(s/60)+' min '+(s%60)+' s':s+' s'};
+const clipRating=sc=>{const n=Number(sc);return Number.isInteger(n)&&n>=1&&n<=10?n:Math.max(1,Math.min(10,Math.round(5+0.6*n)))};
 const STEPS=['Pobieranie','Transkrypcja','Wybór momentów','Montaż'];
 function stepOf(j){const s=j.stage||'';return j.kind=='rerender'?3:s.startsWith('Montuję')?3:s.startsWith('Szukam')?2:s.startsWith('Transkrypcja')?1:0}
 let FIRST=null;function isOpen(id){return id in S?S[id]:FIRST==id}
@@ -29,7 +30,7 @@ function html(j){
    ${n?`<a class=btn href="/zip/${encodeURIComponent(j.id)}">⬇ ZIP</a> <button class=s data-act=toggle>${open?'▲ Zwiń':'▼ Pokaż klipy'}</button> <button class=s data-act=copyall>📋 Kopiuj wszystkie opisy</button>`:'<span class=st>Brak klipów – film za krótki lub bez mowy?</span>'}
    ${LOCAL?'<button class=s data-act=folder>📂 Otwórz folder</button>':''} <button class=s data-act=rerun>🔁 Zrób ponownie</button></div>`;
   if(open&&n)h+='<div class=clips>'+j.clips.map((c,k)=>`<div><video id="v-${esc(j.id)}-${k}" controls playsinline preload=metadata src="${base+encodeURIComponent(c.file)}?v=${c.ver||0}#t=0.5"></video>
-   <b>${esc(c.title)}</b><div class=st>${c.duration} s · score ${c.score}</div>
+   <b>${esc(c.title)}</b><div class=st>${c.duration} s · ocena ${clipRating(c.score)}/10</div>
    <p><a class=btn href="${base+encodeURIComponent(c.file)}?dl=1&v=${c.ver||0}">⬇ Pobierz</a> <a class=btn style="background:#2b2f3a" href="/edit/${encodeURIComponent(j.video_id)}/${parseInt((c.file.match(/[0-9]+/)||['1'])[0],10)}">✏️ Edytuj</a></p>
    <div class=cap>${esc(c.caption)}</div><button class=s data-act=copy data-k=${k}>Kopiuj</button><span class=st> opis + hashtagi</span></div>`).join('')+'</div>'}
  return h}
