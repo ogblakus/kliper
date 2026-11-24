@@ -9,10 +9,9 @@ PY = sys.executable
 TTL = 6 * 3600
 _lock = threading.Lock()
 
-# clip: suggested clip length (s); rights: copyrighted film/cartoon material -> show notice in UI
+# clip: suggested clip length (s); rights: True -> RIGHTS_MSG, or a warning string shown in the UI
 PRESETS = {
-    "podcasty": {"label": "Podcasty", "pl": ["podcast wywiad", "rozmowa podcast gość"], "en": ["podcast interview", "podcast episode guest"]},
-    "podcast_en": {"label": "Podcast angielski", "lang": "en", "pl": ["podcast interview", "podcast episode guest"], "en": ["podcast interview full episode", "long form conversation podcast", "podcast clips viral guest story"]},
+    "podcasty": {"label": "Podcasty", "pl": ["podcast wywiad", "rozmowa podcast gość"], "en": ["podcast interview", "podcast episode guest", "podcast interview full episode", "long form conversation podcast", "podcast clips viral guest story"]},
     "tworcy": {"label": "Twórcy (YouTuberzy, influencerzy)", "pl": ["youtuber wywiad", "twórca internetowy rozmowa", "influencer podcast szczerze"], "en": ["youtuber interview", "content creator podcast", "creator economy interview"]},
     "motywacja": {"label": "Motywacja", "pl": ["motywacja rozwój osobisty podcast", "mindset wywiad"], "en": ["motivation podcast", "mindset discipline interview"]},
     "biznes": {"label": "Biznes / pieniądze", "pl": ["biznes przedsiębiorca wywiad", "pieniądze inwestowanie podcast"], "en": ["business entrepreneur podcast", "money investing interview"]},
@@ -26,8 +25,19 @@ PRESETS = {
     "humor": {"label": "Humor", "pl": ["stand-up podcast śmieszne", "kabaret rozmowa komik"], "en": ["comedy podcast", "comedian interview funny"]},
     "sport": {"label": "Sport", "pl": ["sport wywiad podcast", "piłka nożna rozmowa"], "en": ["sports podcast interview", "athlete interview"]},
     "tech": {"label": "Tech / AI", "pl": ["sztuczna inteligencja AI rozmowa", "technologia podcast"], "en": ["AI podcast interview", "tech podcast artificial intelligence"]},
+    "gta6": {"label": "GTA 6", "rights": "⚖️ Zwiastuny i materiały Rockstar (GTA 6) są chronione prawem autorskim. Lepiej klipować komentarze i reakcje niż sam trailer.", "clip": [20, 50], "pl": ["GTA 6", "GTA 6 trailer reakcja", "GTA 6 przecieki", "GTA 6 data premiery", "GTA VI analiza zwiastuna"], "en": ["GTA 6", "GTA 6 trailer breakdown", "GTA 6 leaks", "GTA 6 release date", "GTA 6 reaction", "GTA VI news"]},
 }
 RIGHTS_MSG = "⚖️ Materiały z filmów, seriali i bajek są zwykle chronione prawem autorskim. Odpowiadasz za posiadanie praw/zgody na ich użycie."
+# Old niche keys that settings or a saved form may still send.
+PRESET_ALIAS = {"podcast_en": "podcasty"}
+
+def preset_cfg(key):
+    return PRESETS.get(PRESET_ALIAS.get(key, key), {})
+
+def rights_text(preset, topic=""):
+    r = preset_cfg(preset).get("rights")
+    if not r or str(topic or "").strip(): return ""
+    return r if isinstance(r, str) else RIGHTS_MSG
 LONGFORM = re.compile(r"podcast|wywiad|rozmow|interview|odc\.|ep\.|episode|#\d+|gość|guest|q&a|live", re.I)
 
 def _sp(age, dur, cc, by_views=True):
@@ -214,7 +224,7 @@ def _load():
 def search(topic="", preset="", lang="pl", age=7, cc=False, top=15, min_views=20000):
     lang = "en" if lang == "en" else "pl"; age = 7 if int(age) <= 7 else (30 if int(age) <= 30 else 365)
     mv = max(0, int(min_views or 0))
-    queries = [topic.strip()] if topic.strip() else PRESETS.get(preset, PRESETS["podcasty"])[lang]
+    queries = [topic.strip()] if topic.strip() else (preset_cfg(preset) or PRESETS["podcasty"])[lang]
     key = json.dumps([queries, lang, age, bool(cc), mv], ensure_ascii=False)
     with _lock: c = _load()
     if key in c and time.time() - c[key]["t"] < TTL and c[key]["r"].get("results"): return {**c[key]["r"], "cached": True}
