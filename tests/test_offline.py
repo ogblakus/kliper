@@ -11,8 +11,9 @@ sys.path.insert(0, str(ROOT / "app"))
 
 import finder
 from main import (
-    STOP, autosub_key, clip_rating, clip_title, find_moments, keep_intervals, make_ass,
-    score_window, sentences, src_to_out, title_and_tags, write_summary,
+    STOP, _drop_phrase_loops, _drop_repeat_segs, autosub_key, clip_rating, clip_title,
+    find_moments, keep_intervals, make_ass, score_window, sentences, src_to_out,
+    title_and_tags, write_summary,
 )
 
 
@@ -197,8 +198,7 @@ def test_title_from_sample_words():
     assert "truth" in low or "nobody" in low
     assert "instagram" not in low
     for bad in ("with", "their", "on", "the"):
-        got = clip_title([bad], "en")
-        assert got.lower() != bad and len(got.split()) >= 3 and got.lower() not in STOP
+        assert clip_title([bad], "en") == ""
     filled = clip_title(["Um so the biggest secret nobody tells you about money."], "en")
     print(f"  filler stripped -> {filled!r}")
     assert filled[0].isupper() and filled.split()[0].lower() not in STOP
@@ -233,9 +233,100 @@ def test_promo_window_scores_lower():
     print(f"  promo   {promo:.2f} {why_p}")
     print(f"  pl      {pl_base:.2f} vs promo {pl_promo:.2f} {why_pl}")
     print(f"  outro   {end:.2f} {why_e}")
-    assert promo < content and "promo" in why_p and "promo" not in why_c
-    assert pl_promo < pl_base and "promo" in why_pl
-    assert end < promo and "outro" in why_e and "outro" not in why_p
+    assert content > -50 and "promo" not in why_c
+    assert promo <= -50 and "promo" in why_p
+    assert pl_promo <= -50 and pl_promo < pl_base and "promo" in why_pl
+    assert end <= -50 and "promo" in why_e
+
+
+def _spread(text, start, end):
+    """Place words evenly from start to end (a sparse or looped window)."""
+    ws = text.split()
+    if not ws: return []
+    step = (end - start) / len(ws)
+    out = []
+    for i, w in enumerate(ws):
+        s = start + i * step
+        out.append(word(w, round(s, 3), round(min(end, s + min(0.3, step * 0.6)), 3)))
+    return out
+
+
+def test_reject_junk_windows_and_titles():
+    import re
+    import numpy as np
+    from types import SimpleNamespace
+    # Repeated end-card phrase, a 9-word minute, and a watermark are not clips.
+    loop = " ".join(["One54 on Instagram"] * 4)
+    sc_loop, why_loop = _window_score(loop, 400, 800)
+    sparse_words = _spread("one two three four five six seven eight nine", 325, 385)
+    sents = sentences(sparse_words)
+    loud = np.zeros(2000)
+    sc_sp, why_sp = score_window(sents, 0, len(sents) - 1, sparse_words, "en", loud, 0.5, None, 800)
+    url = "📷 www .kondy .pl 🔥🔥🔥"
+    sc_url, why_url = _window_score(url, 500, 800)
+    print(f"  loop {sc_loop:.1f} {why_loop}")
+    print(f"  sparse 9 words / 60s {sc_sp:.1f} {why_sp} n={len(sparse_words)}")
+    print(f"  url {sc_url:.1f} {why_url}")
+    assert sc_loop <= -50 and sc_sp <= -50 and why_sp == ["sparse"]
+    assert len(sparse_words) == 9 and sparse_words[-1]["e"] - sparse_words[0]["s"] > 50
+    assert sc_url <= -50
+    # Titles: no placeholder, no trailing comma/conjunction, no URL or mixed-script garbage.
+    assert clip_title([url], "pl") == ""
+    assert clip_title(["with"], "en") == ""
+    cut = clip_title(["Miały na przykład nie mieć na sobie metek,"], "pl")
+    url_title = clip_title(["Www proszę .youtube .com, państwa przerywamy program aby"], "pl")
+    garb = clip_title(["To jest orroviewerенное .ploplesy naprawdę wielki sekret o pieniądzach."], "pl")
+    print(f"  cut {cut!r}")
+    print(f"  url title {url_title!r}")
+    print(f"  garbage {garb!r}")
+    for t in (cut, url_title, garb):
+        assert t and t.lower() not in {"best spoken moment", "najlepszy moment filmu"}
+        assert not re.search(r"[,;]\s*$", t)
+        assert t.split()[-1].lower().strip(".,!?…") not in {"aby", "że", "and", "that"}
+        assert "www" not in t.lower() and "youtube" not in t.lower() and ".com" not in t.lower()
+    assert "metek" in cut.lower()
+    assert "aby" not in url_title.lower().split()[-1]
+    assert "orroviewer" not in garb.lower() and "ploplesy" not in garb.lower() and "sekret" in garb.lower()
+    # Burned captions drop the same garbage tokens.
+    caps = [word("Hello", 0.2, 0.6), word("orroviewerенное", 0.7, 1.0), word(".ploplesy", 1.1, 1.4), word("there", 1.5, 1.9)]
+    p = Path(tempfile.mkdtemp()) / "c.ass"
+    make_ass(caps, [(0.0, 3.0)], p, "Arial", size=40)
+    shown = p.read_text(encoding="utf-8")
+    assert "HELLO" in shown and "THERE" in shown
+    assert "PLOPLESY" not in shown.upper() and "ORROVIEWER" not in shown.upper()
+    # Verbatim segment loop and a 3x phrase are removed from the transcript.
+    segs = [SimpleNamespace(text="Hello there"), SimpleNamespace(text="One54 on Instagram"),
+            SimpleNamespace(text="One54 on Instagram"), SimpleNamespace(text="One54 on Instagram")]
+    kept = [s.text for s in _drop_repeat_segs(segs)]
+    assert kept == ["Hello there", "One54 on Instagram"]
+    phrase = []
+    t = 0.0
+    for _ in range(4):
+        for w in ("One54", "on", "Instagram"):
+            phrase.append({"w": w, "s": t, "e": t + 0.2}); t += 0.3
+    phrase.append({"w": "Nobody", "s": t, "e": t + 0.2})
+    cleaned = _drop_phrase_loops(phrase)
+    print(f"  phrase loop kept {[w['w'] for w in cleaned]}")
+    assert [w["w"] for w in cleaned] == ["Nobody"]
+    # Asked for 5 clips: only the real window comes back, junk is not filler.
+    good = _spread(
+        "Nobody tells you the secret truth about money fear love and the biggest mistake "
+        "everyone always makes when life changes really fast today here friends listen "
+        "carefully remember this reason actually matters most right now okay yes",
+        10, 34)
+    good[-1]["w"] = good[-1]["w"] + "."
+    words = good + _spread(" ".join(["One54 on Instagram"] * 6), 100, 140) + sparse_words + _spread(url, 500, 540)
+    moments = find_moments(words, "en", np.zeros(1600), 0.5, None, n=5, dmin=20, dmax=60)
+    titles = []
+    for m in moments:
+        title, _, _ = title_and_tags(dict(m), "en")
+        titles.append(title)
+    print(f"  moments {len(moments)} titles {titles}")
+    assert 0 < len(moments) < 5
+    assert titles and all(titles)
+    blob = " ".join(titles).lower()
+    assert "instagram" not in blob and "kondy" not in blob and "best spoken" not in blob
+    assert any("truth" in t.lower() or "secret" in t.lower() or "nobody" in t.lower() for t in titles)
 
 
 def test_presets_language_neutral():
