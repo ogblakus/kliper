@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline checks for silence cuts, captions, clip rating, and the Podcasty label.
+"""Offline checks for silence cuts, captions, clip rating, titles, and finder presets.
 
 No YouTube and no network. Run: python tests/test_offline.py
 """
@@ -10,7 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "app"))
 
 import finder
-from main import autosub_key, clip_rating, find_moments, keep_intervals, make_ass, src_to_out, write_summary
+from main import (
+    STOP, autosub_key, clip_rating, clip_title, find_moments, keep_intervals, make_ass,
+    score_window, sentences, src_to_out, title_and_tags, write_summary,
+)
 
 
 def word(text, s, e, p=0.9):
@@ -157,6 +160,108 @@ def test_podcasty_label():
     print(f"  PRESETS['podcasty']['label'] == {label!r} (en queries kept: {finder.PRESETS['podcasty']['en'][0]!r})")
     assert label == "Podcasty"
     assert finder.PRESETS["podcasty"]["pl"] and finder.PRESETS["podcasty"]["en"]
+
+
+def _words_from_chunks(chunks, gap=1.0, start=1.0):
+    words, t = [], start
+    for ch in chunks:
+        for w in ch.split():
+            words.append(word(w, round(t, 3), round(t + 0.25, 3)))
+            t += 0.35
+        t += gap
+    return words
+
+
+def _old_title(first_sentence):
+    """Previous title: first 9 words of the opening sentence."""
+    w = first_sentence.split()
+    return " ".join(w[:9]) + ("…" if len(w) > 9 else "")
+
+
+def test_title_from_sample_words():
+    chunks = ["the nd", "with", "their", "on", "One54 on Instagram.",
+              "nobody tells you the truth about money and fear."]
+    parts = [s["text"] for s in sentences(_words_from_chunks(chunks))]
+    old = _old_title(parts[0])
+    title = clip_title(parts, "en")
+    print(f"  before {old!r}")
+    print(f"  after  {title!r}")
+    print(f"  sentences: {parts}")
+    toks = title.split()
+    assert old == "the nd"
+    assert len(toks) >= 3 and len(title) >= 15 and len(title) <= 60
+    assert title[0].isupper()
+    assert toks[0].lower().strip(".,!?…") not in STOP
+    assert title.lower() not in STOP and not (len(toks) == 1 and toks[0].lower() in STOP)
+    low = title.lower()
+    assert "truth" in low or "nobody" in low
+    assert "instagram" not in low
+    for bad in ("with", "their", "on", "the"):
+        got = clip_title([bad], "en")
+        assert got.lower() != bad and len(got.split()) >= 3 and got.lower() not in STOP
+    filled = clip_title(["Um so the biggest secret nobody tells you about money."], "en")
+    print(f"  filler stripped -> {filled!r}")
+    assert filled[0].isupper() and filled.split()[0].lower() not in STOP
+    assert not filled.lower().startswith("um") and not filled.lower().startswith("the ")
+    long = "Nobody tells you the secret truth about money fear and the biggest mistake everyone always makes in life today."
+    capped = clip_title([long], "en")
+    print(f"  capped ({len(capped)} chars) -> {capped!r}")
+    assert 15 <= len(capped) <= 60 and len(capped.split()) >= 3
+    assert all(w in long.split() for w in capped.split())
+    m = {"hook": parts[0], "text": " ".join(parts), "sents": parts}
+    title2, cap, _tags = title_and_tags(m, "en")
+    assert title2 == title and "truth" in m["hook"].lower() and "sents" not in m
+    assert title2 in cap
+
+
+def _window_score(text, start, dur):
+    import numpy as np
+    words = _words_from_chunks([text], gap=0.0, start=start)
+    sents = sentences(words)
+    loud = np.zeros(int(dur / 0.5) + 20)
+    return score_window(sents, 0, len(sents) - 1, words, "en", loud, 0.5, None, dur)
+
+
+def test_promo_window_scores_lower():
+    body = "Nobody tells you the truth about money and the fear that always changes people"
+    content, why_c = _window_score(body + " after breakfast today.", 40, 800)
+    promo, why_p = _window_score(body + " please subscribe now.", 40, 800)
+    pl_base, _ = _window_score("Nikt nie mówi prawdy o pieniądzach i o strachu który zawsze zmienia ludzi po prostu dzisiaj.", 40, 800)
+    pl_promo, why_pl = _window_score("Nikt nie mówi prawdy o pieniądzach i o strachu który zawsze zmienia ludzi zostaw lajka teraz.", 40, 800)
+    end, why_e = _window_score(body + " please subscribe now.", 760, 800)
+    print(f"  content {content:.2f} {why_c}")
+    print(f"  promo   {promo:.2f} {why_p}")
+    print(f"  pl      {pl_base:.2f} vs promo {pl_promo:.2f} {why_pl}")
+    print(f"  outro   {end:.2f} {why_e}")
+    assert promo < content and "promo" in why_p and "promo" not in why_c
+    assert pl_promo < pl_base and "promo" in why_pl
+    assert end < promo and "outro" in why_e and "outro" not in why_p
+
+
+def test_presets_language_neutral():
+    import re
+    assert "podcast_en" not in finder.PRESETS
+    assert [k for k in finder.PRESETS if "podcast" in k] == ["podcasty"]
+    assert finder.preset_cfg("podcast_en") is finder.PRESETS["podcasty"]
+    assert "long form conversation podcast" in finder.PRESETS["podcasty"]["en"]
+    assert finder.PRESETS["podcasty"]["pl"][0] == "podcast wywiad"
+    assert "gta6" in finder.PRESETS
+    g = finder.PRESETS["gta6"]
+    assert g["label"] == "GTA 6"
+    assert "GTA 6 przecieki" in g["pl"] and "GTA 6 trailer breakdown" in g["en"]
+    assert len(g["clip"]) == 2 and g["clip"][0] < g["clip"][1]
+    assert "Rockstar" in finder.rights_text("gta6")
+    assert finder.rights_text("bajki") == finder.RIGHTS_MSG
+    assert finder.rights_text("gta6", "własny temat") == ""
+    assert finder.rights_text("podcast_en") == ""
+    for k, v in finder.PRESETS.items():
+        assert isinstance(v.get("pl"), list) and v["pl"], k
+        assert isinstance(v.get("en"), list) and v["en"], k
+        assert "lang" not in v, k
+        lab = v["label"]
+        assert "angielski" not in lab.lower(), lab
+        assert not re.search(r"\b(PL|EN)\b", lab), lab
+    print(f"  {len(finder.PRESETS)} presets, gta6 clip={g['clip']}, podcast_en -> podcasty")
 
 
 def test_js_rating_matches():

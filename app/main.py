@@ -244,6 +244,16 @@ STOP = set("the a an and or but so to of in on at for with is are was were be be
        set("i w na z że to się nie jest jak do co ale o a tak po za od dla czy jest być są był była mi mnie ja ty my oni ona on go jej ich tego tym ten ta te no też już tylko bardzo może więc bo".split())
 
 EXTRA_STOP = set("then those there's there these they're that's what's it's i've i'm don't didn't going gonna because about would could should which where while every something thing things people really actually right yeah okay jest żeby jakby właśnie wtedy który która które tutaj teraz bardzo jeszcze wszystko trochę mówi".split())
+_LEAD = STOP | EXTRA_STOP | WEAK_START
+# Outro / sponsor CTAs (EN+PL). Flat penalty in score_window; also downranks a sentence as a title.
+PROMO = re.compile(
+    r"follow\s+(?:me|us)|subscri\w*|subskry\w*|obserwuj\w*|"
+    r"link\s+in\s+(?:the\s+)?description|link\s+w\s+opisie|"
+    r"zostaw\w*\s+(?:lajk\w*|łapk\w*|sub\w*)|"
+    r"kod\s+rabatow\w*|(?:promo|discount)\s+code|sponsor\w*|"
+    r"on\s+instagram\w*|na\s+instagram\w*|on\s+tiktok|na\s+tiktok\w*|"
+    r"@[\w.]{3,}",
+    re.I)
 
 def sentences(words):
     out, cur = [], []
@@ -294,7 +304,13 @@ def score_window(sents, a, b, words, lang, loud, hop, heat, dur_total):
         hv = [x["value"] for x in heat if x["end_time"] > s and x["start_time"] < e]
         if hv: m = float(np.mean(hv)); sc += m * 6; why.append(f"heat={m:.2f}")
     sc += -abs(D - 38) / 40  # prefer ~30-45s
-    if s < 8: sc -= 0.5  # intro
+    if s < 8: sc -= 0.5  # intro (opening seconds)
+    win = " ".join(sents[k]["text"] for k in range(a, b + 1))
+    if PROMO.search(win):
+        sc -= 3.0; why.append("promo")  # subscribe / sponsor / social CTA
+        tail = max(dur_total * 0.05, 60) if dur_total else 0  # last ~5% or last 60s
+        if dur_total and s >= dur_total - tail:
+            sc -= 2.0; why.append("outro")
     return sc, why
 
 def clip_bounds(words, i0, i1, head=0.15, tail=0.4):
@@ -353,17 +369,83 @@ def find_moments(words, lang, loud, hop, heat, n, dmin=20, dmax=60, regions=None
     for c in cands:
         s, e = sents[c[1]]["s"], sents[c[2]]["e"]
         if all(e <= p["start"] - 1 or s >= p["end"] + 1 for p in picked):
-            text = " ".join(sents[k]["text"] for k in range(c[1], c[2] + 1))
+            parts = [sents[k]["text"] for k in range(c[1], c[2] + 1)]
             i0, i1 = sents[c[1]]["i0"], sents[c[2]]["i1"]
             bs, be = clip_bounds(words, i0, i1)
             picked.append({"start": bs, "end": be, "score": clip_rating(c[0]), "score_raw": round(c[0], 2),
-                           "why": c[3], "hook": sents[c[1]]["text"], "text": text})
+                           "why": c[3], "hook": parts[0], "text": " ".join(parts), "sents": parts})
         if len(picked) >= n: break
     return picked
 
+def _cap_first(s):
+    return (s[:1].upper() + s[1:]) if s else s
+
+def sent_strength(text, lang):
+    """Same hook/emotion cues as score_window, plus a bonus for a finished sentence."""
+    L = "pl" if lang == "pl" else "en"
+    hook_set, emo_set = set(HOOK[L].split()) | set(HOOK["en"].split()), set(EMO[L].split())
+    raw = re.sub(r"\s+", " ", text or "").strip(" \"'“”„«»")
+    toks = [norm(w) for w in raw.split() if norm(w)]
+    if not toks: return -99.0
+    h = sum(t in hook_set for t in toks) + 1.5 * raw.endswith("?") + 0.8 * any(any(c.isdigit() for c in t) for t in toks)
+    h += 0.6 * any(t in ("you", "your", "ty", "ciebie", "twój", "twoj", "wy") for t in toks)
+    emo = sum(t in emo_set or t in hook_set for t in toks) / max(len(toks), 1) * 30
+    sc = min(h, 4) * 1.2 + min(emo, 3)
+    if re.search(r"[.!?…]$", raw): sc += 1.5
+    if toks[0] in WEAK_START: sc -= 1.5
+    content = [t for t in toks if t not in _LEAD and len(t) > 2]
+    if len(toks) < 3 or len(content) < 2: sc -= 4
+    if PROMO.search(raw): sc -= 3
+    return sc
+
+def _tiny(w):
+    b = norm(w)
+    return len(b) < 3 and not any(c.isdigit() for c in b)
+
+def clean_title(text):
+    """Strip leading fillers and cut-off fragments; keep a 3-word / 15-char phrase, cap ~60."""
+    words = re.sub(r"\s+", " ", text or "").strip().split()
+    lead = lambda w: (not norm(w)) or norm(w) in _LEAD or _tiny(w)
+    while words and lead(words[0]): words.pop(0)
+    while len(words) > 3 and lead(words[-1]): words.pop()
+    phrase = " ".join(words).strip(" \t\"'“”„«»")
+    phrase = re.sub(r"[\s.,;:–—\-…]+$", "", phrase).strip()
+    if len(phrase) > 60:
+        cut = phrase[:60]; sp = cut.rfind(" ")
+        phrase = (cut[:sp] if sp >= 15 else cut).strip(" \t.,;:–—-")
+        bits = phrase.split()
+        while len(bits) > 3 and lead(bits[-1]): bits.pop()
+        phrase = " ".join(bits)
+    toks = [norm(w) for w in phrase.split() if norm(w)]
+    if len(toks) < 3 or len(phrase) < 15 or len(toks) == 1: return ""
+    if all(t in _LEAD for t in toks): return ""
+    return _cap_first(phrase)
+
+def _pick_title(parts, lang):
+    parts = [re.sub(r"\s+", " ", p).strip() for p in parts if p and str(p).strip()]
+    order = sorted(range(len(parts)), key=lambda i: (sent_strength(parts[i], lang), -i), reverse=True)
+    for i in order:
+        t = clean_title(parts[i])
+        if t: return t, parts[i]
+    content = [w.strip(".,;:!?…\"'“”„") for p in parts for w in p.split() if len(norm(w)) > 2 and norm(w) not in _LEAD]
+    t = clean_title(" ".join(w for w in content if w))
+    if t: return t, " ".join(content)
+    return ("Najlepszy moment filmu" if lang == "pl" else "Best spoken moment"), ""
+
+def clip_title(parts, lang="en"):
+    """Meaningful phrase from the clip's sentences. Never a lone stopword."""
+    return _pick_title(parts, lang)[0]
+
+def _clip_parts(m):
+    parts = [s for s in (m.pop("sents", None) or []) if str(s).strip()]
+    if parts: return parts
+    blob = (m.get("text") or m.get("hook") or "").strip()
+    parts = [p for p in re.split(r"(?<=[.!?…])\s+", blob) if p.strip()]
+    return parts or ([blob] if blob else [])
+
 def title_and_tags(m, lang):
-    hk = re.sub(r"\s+", " ", m["hook"]).strip()
-    w = hk.split(); title = " ".join(w[:9]) + ("…" if len(w) > 9 else "")
+    title, src = _pick_title(_clip_parts(m), lang)
+    m["hook"] = src or title
     toks = [norm(t) for t in m["text"].split()]
     freq = {}
     for t in toks:
@@ -626,6 +708,8 @@ def main():
             for m in moments:
                 for k in ("text", "hook"):
                     m[k] = " ".join(fx.get(t, t) for t in m[k].split())
+                if m.get("sents"):
+                    m["sents"] = [" ".join(fx.get(t, t) for t in s.split()) for s in m["sents"]]
             log(f"spellcheck flagged={st['flagged']} fixed={st['fixed']} in {time.time()-t:.1f}s")
             tjp = d / f"transcript_{a.model}.json"; tr["words"] = words
             tjp.write_text(json.dumps(tr, ensure_ascii=False), encoding="utf-8")

@@ -227,8 +227,8 @@ def api_find(r: Request, topic: str = Form(""), preset: str = Form("podcasty"), 
     need(r)
     os.environ.update(child_env())
     try: return {**finder.search(topic[:120], preset, lang, age, bool(cc), min_views=min_views),
-                "rights": finder.RIGHTS_MSG if finder.PRESETS.get(preset, {}).get("rights") and not topic.strip() else "",
-                "clip": finder.PRESETS.get(preset, {}).get("clip")}
+                "rights": finder.rights_text(preset, topic),
+                "clip": finder.preset_cfg(preset).get("clip")}
     except Exception as e: raise HTTPException(500, f"Wyszukiwanie nie powiodło się: {e}")
 
 JOBS_JS = (APP / "jobs.js").read_text(encoding="utf-8").replace("__LOCAL__", "true")
