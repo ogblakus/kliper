@@ -37,7 +37,7 @@ def _folder_name(info, wdir):
     t = _slug(info.get("title"))
     return f"{time.strftime('%Y-%m-%d')}_{t}__{yid}" if t else yid
 
-def download(url, wdir):
+def download(url, wdir, lang="auto"):
     if Path(url).exists():  # local file
         vid = re.sub(r"\W+", "_", Path(url).stem)[:40]
         d = wdir / vid; d.mkdir(parents=True, exist_ok=True)
@@ -65,7 +65,7 @@ def download(url, wdir):
     vid = _folder_name(info, wdir); d = wdir / vid; d.mkdir(parents=True, exist_ok=True)
     (d / "info.json").write_text(encoding="utf-8", data=json.dumps({k: info.get(k) for k in ["id","title","duration","heatmap","uploader","license","webpage_url","chapters","tags","description","language"]}, ensure_ascii=False))
     import threading
-    th = threading.Thread(target=fetch_autosubs, args=(info, d), daemon=True); th.start()  # in parallel with the video download
+    th = threading.Thread(target=fetch_autosubs, args=(info, d, lang), daemon=True); th.start()  # in parallel with the video download
     dst = d / "video.mp4"
     if not dst.exists():
         fmt = "bv*[height<=1080][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=1080]+ba/b[height<=1080]/b"
@@ -78,15 +78,24 @@ def download(url, wdir):
     th.join(30)
     return vid, d, info
 
-def fetch_autosubs(info, d):
+def autosub_key(ac, lang, info_lang=""):
+    """Prefer {lang}-orig, then the video's {info_lang}-orig, else the first *-orig track."""
+    if not ac: return None
+    req, info = (lang or "").split("-")[0], (info_lang or "").split("-")[0]
+    for code in (req, info):
+        if code and code != "auto" and f"{code}-orig" in ac: return f"{code}-orig"
+    keys = [k for k in ac if k.endswith("-orig")] + ([info] if info and info in ac else [])
+    return keys[0] if keys else None
+
+def fetch_autosubs(info, d, lang="auto"):
     """Fast path: YouTube auto-captions (json3, word timings) in the original language -> d/autosubs.json."""
     out = d / "autosubs.json"
     if out.exists(): return
     try:
-        ac = info.get("automatic_captions") or {}; lang = (info.get("language") or "").split("-")[0]
-        keys = [k for k in ac if k.endswith("-orig")] + ([lang] if lang in ac else [])
-        if not keys: return
-        url = next((f["url"] for f in ac[keys[0]] if f.get("ext") == "json3"), None)
+        ac = info.get("automatic_captions") or {}
+        key = autosub_key(ac, lang, info.get("language") or "")
+        if not key: return
+        url = next((f["url"] for f in ac[key] if f.get("ext") == "json3"), None)
         if not url: return
         import urllib.request
         ev = json.loads(urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"}), timeout=25).read().decode("utf-8")).get("events", [])
@@ -102,7 +111,7 @@ def fetch_autosubs(info, d):
             est = w["s"] + 0.12 + 0.065 * len(w["w"])  # YouTube gives only word starts: estimate the end so pauses stay visible
             w["e"] = round(max(w["s"] + 0.05, min(nx - 0.02, est, w["e"] or est)), 3)
         if len(words) > 50:
-            out.write_text(json.dumps({"language": keys[0].split("-")[0], "words": words}, ensure_ascii=False), encoding="utf-8"); log(f"autosubs {keys[0]} words={len(words)}")
+            out.write_text(json.dumps({"language": key.split("-")[0], "words": words}, ensure_ascii=False), encoding="utf-8"); log(f"autosubs {key} words={len(words)}")
     except Exception as e:
         log("autosubs unavailable:", e)
 
@@ -322,6 +331,10 @@ def apply_edits(words, edits):
         out.append(w)
     return out
 
+def clip_rating(sc):
+    """Raw heuristic sum -> integer 1–10 (5 is a neutral clip)."""
+    return int(max(1, min(10, round(5 + 0.6 * sc))))
+
 def find_moments(words, lang, loud, hop, heat, n, dmin=20, dmax=60, regions=None):
     sents = sentences(words); dur_total = words[-1]["e"]
     inreg = lambda s, e: not regions or any(s >= a + 0.3 and e <= b - 0.3 for a, b in regions)
@@ -343,7 +356,7 @@ def find_moments(words, lang, loud, hop, heat, n, dmin=20, dmax=60, regions=None
             text = " ".join(sents[k]["text"] for k in range(c[1], c[2] + 1))
             i0, i1 = sents[c[1]]["i0"], sents[c[2]]["i1"]
             bs, be = clip_bounds(words, i0, i1)
-            picked.append({"start": bs, "end": be, "score": round(c[0], 2),
+            picked.append({"start": bs, "end": be, "score": clip_rating(c[0]), "score_raw": round(c[0], 2),
                            "why": c[3], "hook": sents[c[1]]["text"], "text": text})
         if len(picked) >= n: break
     return picked
@@ -395,15 +408,19 @@ def llm_titles(moments, lang):
         log("LLM fail, using heuristics:", e); return False
 
 # ---------------------------------------------------------------- edit
-def keep_intervals(words, s, e, max_gap=0.6, pad=0.2):
+def keep_intervals(words, s, e, max_gap=2.0, pad=0.35):
+    """Drop a pause only when it is longer than max_gap, leaving `pad` on each side.
+    YouTube autosub words (p<=0.5) have guessed ends, so a gap they touch is kept.
+    If the trim would leave under 75% of the window, return the window unchanged."""
     ws = [w for w in words if w["s"] >= s - 0.05 and w["e"] <= e + 0.05]
     if not ws: return [(s, e)]
     iv = [[s, ws[0]["e"]]]
     for a, b in zip(ws, ws[1:]):
-        if b["s"] - a["e"] > max_gap + 2 * pad:
+        if b["s"] - a["e"] > max_gap + 2 * pad and min(a.get("p", 1), b.get("p", 1)) > 0.5:
             iv[-1][1] = a["e"] + pad; iv.append([b["s"] - pad, b["e"]])
         else: iv[-1][1] = b["e"]
     iv[-1][1] = e
+    if sum(b - a for a, b in iv) < 0.75 * (e - s): return [(s, e)]
     return [(round(a, 3), round(b, 3)) for a, b in iv]
 
 def src_to_out(t, iv):
@@ -419,7 +436,7 @@ def ass_time(t):
     return f"{h}:{m:02d}:{s:05.2f}"
 
 def make_ass(words, iv, path, font, size=112, hl="&H0000E5FF", words_per=3):
-    ws = [w for w in words if w["s"] >= iv[0][0] - 0.05 and w["e"] <= iv[-1][1] + 0.05]
+    ws = [w for w in words if any(w["s"] < b and w["e"] > a for a, b in iv)]
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -439,7 +456,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     for i, w in enumerate(ws):
         cur.append(w)
         nxt = ws[i+1] if i + 1 < len(ws) else None
-        if len(cur) >= words_per or (nxt and sum(len(x["w"]) + 1 for x in cur) + len(nxt["w"]) > 18) or re.search(r"[.!?,;:]$", w["w"]) or (nxt and nxt["s"] - w["e"] > 0.5) or not nxt:
+        if len(cur) >= words_per or (nxt and sum(len(x["w"]) + 1 for x in cur) + len(nxt["w"]) > 24) or re.search(r"[.!?,;:]$", w["w"]) or (nxt and nxt["s"] - w["e"] > 0.5) or not nxt:
             chunks.append(cur); cur = []
     for ch in chunks:
         for k, w in enumerate(ch):
@@ -573,7 +590,7 @@ def main():
     if a.rerender: return rerender(a.rerender, a.clip, a.font)
     if not a.url: ap.error("podaj URL")
     WORK.mkdir(exist_ok=True)
-    vid, d, info = download(a.url, WORK); timings["download"] = time.time() - T0
+    vid, d, info = download(a.url, WORK, a.lang); timings["download"] = time.time() - T0
     meta = json.loads((d / "info.json").read_text(encoding="utf-8")) if (d / "info.json").exists() else info
     t = time.time(); prompt = ((meta.get("title") or "") + ". " + (meta.get("description") or "")[:600]).strip(". ")
     if a.lang == "pl" or (a.lang == "auto" and re.search(r"[ąćęłńóśźż]", prompt, re.I)): prompt = "Rozmowa po polsku. " + prompt
@@ -637,7 +654,13 @@ def write_summary(od, summ):
     moments = summ["clips"]
     md = [f"# {summ.get('title')}\n", f"Źródło: {summ.get('url')} · język: {summ.get('language')}\n"]
     for i, m in enumerate(moments, 1):
-        md.append(f"## {i}. {m['title']}  (score {m['score']})\n- plik: `{Path(m['file']).name}` · {ass_time(m['start'])}–{ass_time(m['end'])} · {m['duration']}s · crop: {m['crop_mode']}\n- opis: {m['caption']}\n- hook: „{m['hook']}”\n")
+        sc, raw = m.get("score"), m.get("score_raw")
+        rating = int(sc) if isinstance(sc, (int, float)) and not isinstance(sc, bool) and float(sc).is_integer() and 1 <= sc <= 10 else None
+        if rating is None:
+            base = raw if raw is not None else sc
+            rating, raw = clip_rating(base), round(float(base), 2)
+        bit = f"ocena {rating}/10" + (f", raw {raw}" if raw is not None else "")
+        md.append(f"## {i}. {m['title']}  ({bit})\n- plik: `{Path(m['file']).name}` · {ass_time(m['start'])}–{ass_time(m['end'])} · {m['duration']}s · crop: {m['crop_mode']}\n- opis: {m['caption']}\n- hook: „{m['hook']}”\n")
     (od / "summary.md").write_text(encoding="utf-8", data="\n".join(md))
 
 def rerender(vid, n, font):
