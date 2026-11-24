@@ -12,7 +12,8 @@ function sig(j){return JSON.stringify([j.status,j.stage,j.progress,j.total,j.fin
 function allCaps(j){return (j.clips||[]).map((c,k)=>`#${k+1} ${c.title}\n${c.caption}`).join('\n\n')}
 function html(j){
  const t=new Date(j.created*1000).toLocaleString('pl-PL');
- let h=`<div class=jh><div><b>${esc(j.title||j.url)}</b><div class=st>${t}${j.kind=='rerender'?'':' · '+j.n+' klipów · '+esc(j.lang)}</div></div>
+ const nshow=j.status=='done'&&j.kind!='rerender'?(j.clips||[]).length:j.n;
+ let h=`<div class=jh><div><b>${esc(j.title||j.url)}</b><div class=st>${t}${j.kind=='rerender'?'':' · '+nshow+' klipów · '+esc(j.lang)}</div></div>
   <button class="s ic" data-act=del title="Usuń z listy">🗑</button></div>`;
  const el=j.started?((j.finished||Date.now()/1000)-j.started):0;
  if(j.status=='queued')h+=`<p>⏳ W kolejce…</p><button class=s data-act=cancel>✖ Anuluj</button>`;

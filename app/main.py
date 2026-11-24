@@ -154,13 +154,46 @@ def _drop_loops(ws):
         out += ws[i:j + 1]; i = j + 1
     return out
 
+def _drop_repeat_segs(segs):
+    """Drop a segment that repeats the previous segment verbatim (hallucination loop)."""
+    out, prev = [], ""
+    for s in segs:
+        t = re.sub(r"\s+", " ", (getattr(s, "text", "") or "")).strip().lower()
+        if t and t == prev: continue
+        if t: prev = t
+        out.append(s)
+    return out
+
+def _drop_phrase_loops(ws):
+    """Drop a multi-word phrase said 3+ times in a row. Cached transcripts have no segment breaks."""
+    ws = _drop_loops(ws)
+    if len(ws) < 6: return ws
+    toks = [re.sub(r"[^\w]", "", w["w"].lower()) for w in ws]
+    drop = [False] * len(ws); i = 0
+    while i < len(ws):
+        found = False
+        for n in range(2, 7):
+            if i + 3 * n > len(ws): continue
+            gram = toks[i:i + n]
+            if not any(gram) or toks[i:i + 3 * n] != gram * 3: continue
+            j = i + 3 * n
+            while j + n <= len(ws) and toks[j:j + n] == gram: j += n
+            for k in range(i, j): drop[k] = True
+            i = j; found = True; break
+        if not found: i += 1
+    return [w for w, d in zip(ws, drop) if not d]
+
 def _words(segs, offset):
-    return _drop_loops([{"w": w.word.strip(), "s": round(w.start + offset, 3), "e": round(w.end + offset, 3), "p": round(w.probability, 3)}
+    segs = _drop_repeat_segs(segs)
+    return _drop_phrase_loops([{"w": w.word.strip(), "s": round(w.start + offset, 3), "e": round(w.end + offset, 3), "p": round(w.probability, 3)}
             for s in segs for w in (s.words or []) if w.word.strip()])
 
 def _run_whisper(m, audio, lang, beam, prompt, offset=0.0):
+    # condition_on_previous_text=False stops the loop feeding itself. compression_ratio_threshold
+    # (2.4) and no_speech_threshold (0.6) are the library defaults and already fail compressed or
+    # silent segments. hallucination_silence_threshold drops end-card silence that still emits text.
     kw = dict(language=None if lang == "auto" else lang, word_timestamps=True, vad_filter=True, beam_size=beam,
-              initial_prompt=prompt or None, condition_on_previous_text=False)
+              initial_prompt=prompt or None, condition_on_previous_text=False, hallucination_silence_threshold=2.0)
     words = None
     # batched pipeline is ~2x faster but faster-whisper 1.2 often returns words for only a few segments -> verify, else fall back
     if os.environ.get("CLIP_BATCHED", "1" if m._gpu else "0") == "1" and len(audio) > 16000 * 40:
@@ -191,7 +224,7 @@ def transcribe(d, lang, model_name, prompt=None, beam=5, regions=None):
     """Full transcription, or (regions=[(s,e),...]) only those parts, merged into coarse words from YouTube subtitles."""
     tj = d / f"transcript_{model_name}.json"
     if tj.exists():
-        c = json.loads(tj.read_text(encoding="utf-8")); c["words"] = _drop_loops(c["words"])
+        c = json.loads(tj.read_text(encoding="utf-8")); c["words"] = _drop_phrase_loops(c["words"])
         if not c.get("regions") or regions is None or all(any(a >= x - 1 and b <= y + 1 for x, y in c["regions"]) for a, b in regions): return c
     log(f"transcribe model={model_name} lang={lang} beam={beam} " + (f"regions={len(regions)} ({sum(b-a for a,b in regions)/60:.1f} min)" if regions else "full"))
     audio = _audio(d); m = load_whisper(model_name)
@@ -245,15 +278,57 @@ STOP = set("the a an and or but so to of in on at for with is are was were be be
 
 EXTRA_STOP = set("then those there's there these they're that's what's it's i've i'm don't didn't going gonna because about would could should which where while every something thing things people really actually right yeah okay jest żeby jakby właśnie wtedy który która które tutaj teraz bardzo jeszcze wszystko trochę mówi".split())
 _LEAD = STOP | EXTRA_STOP | WEAK_START
-# Outro / sponsor CTAs (EN+PL). Flat penalty in score_window; also downranks a sentence as a title.
+_CONJ = {"aby", "że", "ze", "and", "that", "but", "or", "nor", "because", "which", "oraz", "albo"}
+# Promo / end-card / URL. A window that matches is rejected, not merely scored down.
 PROMO = re.compile(
     r"follow\s+(?:me|us)|subscri\w*|subskry\w*|obserwuj\w*|"
     r"link\s+in\s+(?:the\s+)?description|link\s+w\s+opisie|"
     r"zostaw\w*\s+(?:lajk\w*|łapk\w*|sub\w*)|"
     r"kod\s+rabatow\w*|(?:promo|discount)\s+code|sponsor\w*|"
     r"on\s+instagram\w*|na\s+instagram\w*|on\s+tiktok|na\s+tiktok\w*|"
-    r"@[\w.]{3,}",
+    r"on\s+facebook\w*|na\s+facebook\w*|"
+    r"@[\w.]{3,}|\bwww\b|\bhttps?\b|https?://|"
+    r"\.(?:com|pl|net|org|gg|youtube)\b|youtube\.com",
     re.I)
+MIN_RAW = -2.0  # below this (about 3/10) a window is not used to fill the requested clip count
+
+def _latin(c):
+    o = ord(c)
+    return c.isascii() or 0x00C0 <= o <= 0x024F
+
+def _junk_token(w):
+    """Emoji, URLs, dotted garbage (.ploplesy) and mixed-script tokens are not speech."""
+    raw = (w or "").strip().strip("\"'“”„«»()[]")
+    if not raw: return True
+    body = re.sub(r"[.!?…,;:]+$", "", raw).lstrip("-–—")
+    if "." in body: return True
+    letters = [c for c in body if c.isalpha()]
+    if not letters or any(not _latin(c) for c in letters): return True
+    low = re.sub(r"[^\w]", "", body.lower())
+    return low in {"www", "http", "https", "com", "youtube"}
+
+def _median_wps(words, bucket=20.0):
+    if not words: return 2.0
+    counts = {}
+    for w in words: b = int(w["s"] // bucket); counts[b] = counts.get(b, 0) + 1
+    rates = sorted(c / bucket for c in counts.values())
+    return rates[len(rates) // 2] if rates else 2.0
+
+def _repetitive(toks):
+    """Same phrase three times and covering most of the window, or very few unique words."""
+    n = len(toks)
+    if n >= 8 and len(set(toks)) / n < 0.4: return True
+    for k in range(2, 6):
+        if k * 3 > n: break
+        i = 0
+        while i + k * 3 <= n:
+            g = toks[i:i + k]
+            if any(g) and toks[i:i + k * 3] == g * 3:
+                j = i + k * 3
+                while j + k <= n and toks[j:j + k] == g: j += k
+                if (j - i) / n >= 0.4: return True
+            i += 1
+    return False
 
 def sentences(words):
     out, cur = [], []
@@ -277,14 +352,20 @@ def sentences(words):
 
 def norm(t): return re.sub(r"[^\wąćęłńóśźż']", "", t.lower())
 
-def score_window(sents, a, b, words, lang, loud, hop, heat, dur_total):
+def score_window(sents, a, b, words, lang, loud, hop, heat, dur_total, rate=None):
     L = "pl" if lang == "pl" else "en"
     hook_set, emo_set = set(HOOK[L].split()) | set(HOOK["en"].split()), set(EMO[L].split())
     first = sents[a]; s, e = first["s"], sents[b]["e"]; D = e - s
     toks = [norm(words[j]["w"]) for j in range(first["i0"], sents[b]["i1"] + 1)]
     ftoks = [norm(words[j]["w"]) for j in range(first["i0"], first["i1"] + 1)]
     sc, why = 0.0, []
-    if len(toks) >= 8 and len(set(toks)) / len(toks) < 0.35: return -99.0, ["loop"]  # repeated-word junk
+    bare = [t for t in toks if t]
+    win = " ".join(sents[k]["text"] for k in range(a, b + 1))
+    if D >= 12:
+        wps = len(bare) / D; med = _median_wps(words) if rate is None else rate
+        if wps < 1.0 or wps < 0.4 * med: return -99.0, ["sparse"]  # not enough speech to be a clip
+    if _repetitive(bare): return -99.0, ["loop"]
+    if PROMO.search(win): return -99.0, ["promo"]
     h = sum(t in hook_set for t in ftoks) + 1.5 * first["text"].strip().endswith("?") + 0.8 * any(t.isdigit() for t in ftoks)
     h += 0.6 * any(t in ("you", "your", "ty", "ciebie", "twój", "wy") for t in ftoks)
     sc += min(h, 4) * 1.2; why.append(f"hook={h:.1f}")
@@ -305,12 +386,6 @@ def score_window(sents, a, b, words, lang, loud, hop, heat, dur_total):
         if hv: m = float(np.mean(hv)); sc += m * 6; why.append(f"heat={m:.2f}")
     sc += -abs(D - 38) / 40  # prefer ~30-45s
     if s < 8: sc -= 0.5  # intro (opening seconds)
-    win = " ".join(sents[k]["text"] for k in range(a, b + 1))
-    if PROMO.search(win):
-        sc -= 3.0; why.append("promo")  # subscribe / sponsor / social CTA
-        tail = max(dur_total * 0.05, 60) if dur_total else 0  # last ~5% or last 60s
-        if dur_total and s >= dur_total - tail:
-            sc -= 2.0; why.append("outro")
     return sc, why
 
 def clip_bounds(words, i0, i1, head=0.15, tail=0.4):
@@ -352,7 +427,7 @@ def clip_rating(sc):
     return int(max(1, min(10, round(5 + 0.6 * sc))))
 
 def find_moments(words, lang, loud, hop, heat, n, dmin=20, dmax=60, regions=None):
-    sents = sentences(words); dur_total = words[-1]["e"]
+    sents = sentences(words); dur_total = words[-1]["e"]; rate = _median_wps(words)
     inreg = lambda s, e: not regions or any(s >= a + 0.3 and e <= b - 0.3 for a, b in regions)
     cands = []
     for a in range(len(sents)):
@@ -362,14 +437,15 @@ def find_moments(words, lang, loud, hop, heat, n, dmin=20, dmax=60, regions=None
             if D < dmin: continue
             if not (sents[a]["start_ok"] and sents[b]["end_ok"]): continue
             if not inreg(sents[a]["s"], sents[b]["e"]): continue
-            sc, why = score_window(sents, a, b, words, lang, loud, hop, heat, dur_total)
-            if sc <= -50: continue
+            sc, why = score_window(sents, a, b, words, lang, loud, hop, heat, dur_total, rate)
+            if sc <= -50 or sc < MIN_RAW: continue  # failed filter, or too weak to pad the list
             cands.append((sc, a, b, why))
     cands.sort(key=lambda c: -c[0]); picked = []
     for c in cands:
         s, e = sents[c[1]]["s"], sents[c[2]]["e"]
         if all(e <= p["start"] - 1 or s >= p["end"] + 1 for p in picked):
             parts = [sents[k]["text"] for k in range(c[1], c[2] + 1)]
+            if not clip_title(parts, lang): continue  # no real sentence: skip, don't invent a title
             i0, i1 = sents[c[1]]["i0"], sents[c[2]]["i1"]
             bs, be = clip_bounds(words, i0, i1)
             picked.append({"start": bs, "end": be, "score": clip_rating(c[0]), "score_raw": round(c[0], 2),
@@ -402,23 +478,34 @@ def _tiny(w):
     b = norm(w)
     return len(b) < 3 and not any(c.isdigit() for c in b)
 
+def _title_ok(t):
+    if not t: return False
+    if t.lower().strip(" .") in {"best spoken moment", "najlepszy moment filmu"}: return False
+    if re.search(r"[,;:]\s*$", t): return False
+    if norm(t.split()[-1]) in _CONJ: return False
+    if PROMO.search(t): return False
+    return True
+
 def clean_title(text):
-    """Strip leading fillers and cut-off fragments; keep a 3-word / 15-char phrase, cap ~60."""
-    words = re.sub(r"\s+", " ", text or "").strip().split()
-    lead = lambda w: (not norm(w)) or norm(w) in _LEAD or _tiny(w)
+    """Strip fillers, URLs and cut-off tails; keep a 3-word / 15-char phrase, cap ~60."""
+    words = [w for w in re.sub(r"\s+", " ", text or "").strip().split() if not _junk_token(w)]
+    words = [re.sub(r"[,;:，]+$", "", w).strip(" \t\"'“”„«»") for w in words]
+    words = [w for w in words if w]
+    lead = lambda w: (not norm(w)) or norm(w) in _LEAD or norm(w) in _CONJ or _tiny(w)
     while words and lead(words[0]): words.pop(0)
     while len(words) > 3 and lead(words[-1]): words.pop()
-    phrase = " ".join(words).strip(" \t\"'“”„«»")
-    phrase = re.sub(r"[\s.,;:–—\-…]+$", "", phrase).strip()
+    while words and norm(words[-1]) in _CONJ: words.pop()
+    phrase = re.sub(r"[\s,;:–—\-…]+$", "", " ".join(words)).strip()
     if len(phrase) > 60:
         cut = phrase[:60]; sp = cut.rfind(" ")
-        phrase = (cut[:sp] if sp >= 15 else cut).strip(" \t.,;:–—-")
+        phrase = (cut[:sp] if sp >= 15 else cut).strip(" \t,;:–—-")
         bits = phrase.split()
         while len(bits) > 3 and lead(bits[-1]): bits.pop()
+        while bits and norm(bits[-1]) in _CONJ: bits.pop()
         phrase = " ".join(bits)
     toks = [norm(w) for w in phrase.split() if norm(w)]
     if len(toks) < 3 or len(phrase) < 15 or len(toks) == 1: return ""
-    if all(t in _LEAD for t in toks): return ""
+    if all(t in _LEAD or t in _CONJ for t in toks): return ""
     return _cap_first(phrase)
 
 def _pick_title(parts, lang):
@@ -426,11 +513,12 @@ def _pick_title(parts, lang):
     order = sorted(range(len(parts)), key=lambda i: (sent_strength(parts[i], lang), -i), reverse=True)
     for i in order:
         t = clean_title(parts[i])
-        if t: return t, parts[i]
-    content = [w.strip(".,;:!?…\"'“”„") for p in parts for w in p.split() if len(norm(w)) > 2 and norm(w) not in _LEAD]
+        if _title_ok(t): return t, parts[i]
+    content = [w.strip(".,;:!?…\"'“”„") for p in parts for w in p.split()
+               if not _junk_token(w) and len(norm(w)) > 2 and norm(w) not in _LEAD and norm(w) not in _CONJ]
     t = clean_title(" ".join(w for w in content if w))
-    if t: return t, " ".join(content)
-    return ("Najlepszy moment filmu" if lang == "pl" else "Best spoken moment"), ""
+    if _title_ok(t): return t, " ".join(content)
+    return "", ""
 
 def clip_title(parts, lang="en"):
     """Meaningful phrase from the clip's sentences. Never a lone stopword."""
@@ -445,8 +533,9 @@ def _clip_parts(m):
 
 def title_and_tags(m, lang):
     title, src = _pick_title(_clip_parts(m), lang)
+    if not title: return "", "", []
     m["hook"] = src or title
-    toks = [norm(t) for t in m["text"].split()]
+    toks = [norm(t) for t in m["text"].split() if not _junk_token(t)]
     freq = {}
     for t in toks:
         if len(t) > 4 and t not in STOP and t not in EXTRA_STOP and not t.isdigit(): freq[t] = freq.get(t, 0) + 1
@@ -518,7 +607,7 @@ def ass_time(t):
     return f"{h}:{m:02d}:{s:05.2f}"
 
 def make_ass(words, iv, path, font, size=112, hl="&H0000E5FF", words_per=3):
-    ws = [w for w in words if any(w["s"] < b and w["e"] > a for a, b in iv)]
+    ws = [w for w in words if not _junk_token(w["w"]) and any(w["s"] < b and w["e"] > a for a, b in iv)]
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -715,7 +804,12 @@ def main():
             tjp.write_text(json.dumps(tr, ensure_ascii=False), encoding="utf-8")
         except Exception as e:
             log("spellcheck skipped:", e)
-    for m in moments: m["title"], m["caption"], m["tags"] = title_and_tags(m, lang)
+    kept = []
+    for m in moments:
+        m["title"], m["caption"], m["tags"] = title_and_tags(m, lang)
+        if m["title"]: kept.append(m)
+        else: log("skip clip without a title", round(m["start"], 1))
+    moments = kept
     used_llm = llm_titles(moments, lang)
     od = OUT / vid; od.mkdir(parents=True, exist_ok=True); tmp = d / "tmp"; tmp.mkdir(exist_ok=True)
     t = time.time()
