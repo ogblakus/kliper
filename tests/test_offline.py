@@ -12,7 +12,7 @@ sys.path.insert(0, str(ROOT / "app"))
 import finder
 from main import (
     STOP, _TRAIL, _drop_phrase_loops, _drop_repeat_segs, ass_time, autosub_key,
-    clean_speech, clear_clip_outputs, clip_rating, clip_title, find_moments,
+    clean_speech, clear_clip_outputs, clip_rating, clip_title, find_moments, _junk_token, MIN_RAW,
     keep_intervals, make_ass, score_window, sentences, src_to_out, title_and_tags,
     write_summary,
 )
@@ -382,8 +382,8 @@ def test_title_keeps_whole_sentence():
     assert clip_title([whole], "en") == whole
     said = clip_title(["He said why don't you like interview them at all."], "en")
     print(f"  said -> {said!r}")
-    assert said.lower().startswith("he said why")
-    assert not said.lower().startswith("said")
+    assert not said.lower().startswith("he said")
+    assert "why" in said.lower() and "interview" in said.lower()
     joined = clip_title(["What good is security", "if you can see the whole room now."], "en")
     print(f"  joined fragments -> {joined!r}")
     assert joined.lower().startswith("what good is security")
@@ -457,7 +457,9 @@ def test_clip_windows_follow_sentences():
     assert what["start"] <= m1["security"] - 0.4
     assert he["start"] <= m2["Said"] - 0.2
     assert clip_title(what["sents"], "en").lower().startswith("what good is security")
-    assert clip_title(he["sents"], "en").lower().startswith("he said")
+    he_title = clip_title(he["sents"], "en").lower()
+    assert not he_title.startswith("he said")
+    assert "why" in he_title or "interview" in he_title
     ordered = sorted(moments, key=lambda m: m["start"])
     for a, b in zip(ordered, ordered[1:]):
         assert a["end"] <= b["start"] + 0.05, (a["end"], b["start"])
@@ -511,6 +513,143 @@ def test_captions_monotonic_and_inside_clip():
     # same clock the editor shows: a word's caption does not run past the cut clip
     shown = ass_time(src_to_out(1.9, [(0.0, 2.0)]))
     assert shown.startswith("0:00:01.9")
+
+
+def test_numbers_stay_in_speech():
+    kept = ["2008", "2008,", "$10", "10%", "3:45", "1.5", "500", "$200K", "2009", "500zł"]
+    for tok in kept:
+        assert not _junk_token(tok), tok
+    for tok in ("www.kondy.pl", ".ploplesy", "orroviewerенное", "@someone", "https://youtu.be/abc", "www"):
+        assert _junk_token(tok), tok
+    raw = "$200K back in 2008, what would it have been worth today? Around $10 billion."
+    cleaned = clean_speech(raw)
+    print(f"  speech -> {cleaned!r}")
+    assert "$200K" in cleaned and "2008" in cleaned and "$10" in cleaned
+    assert "back in" in cleaned and not cleaned.lower().startswith("back in what")
+    title = clip_title([raw], "en")
+    print(f"  title -> {title!r}")
+    assert "2008" in title or "$200" in title
+    assert "10" in title or "billion" in title
+    pl = clip_title(["Każde 10 przesyłek idzie dzisiaj osobno."], "pl")
+    print(f"  pl -> {pl!r}")
+    assert "10" in pl and "przesyłek" in pl
+    caps = [word("$200K", 0.2, 0.5), word("back", 0.6, 0.8), word("in", 0.9, 1.1),
+            word("2008,", 1.2, 1.6), word(".ploplesy", 1.7, 2.0), word("today", 2.1, 2.4)]
+    p = Path(tempfile.mkdtemp()) / "n.ass"
+    make_ass(caps, [(0.0, 3.0)], p, "Arial", size=40)
+    shown = p.read_text(encoding="utf-8").upper()
+    assert "2008" in shown and "200K" in shown and "TODAY" in shown
+    assert "PLOPLESY" not in shown
+
+
+def _story(text, t, step=0.42):
+    words = []
+    for raw in text.split():
+        words.append(word(raw, round(t, 3), round(t + 0.18, 3)))
+        t += step
+    return words, t
+
+
+def test_numbers_and_snap_keep_windows():
+    import numpy as np
+    filler = " ".join(f"tok{i}x" for i in range(32))
+    # Three stories, each long enough on its own. Only the last ends with a period,
+    # so an aggressive snap would glue the first two together and drop a clip.
+    a = (f"What good is security if you can see the secret truth about money fear "
+         f"and the biggest mistake everyone always makes {filler} right now")
+    b = (f"Back in 2008 and 2009 you put $200K in and around $10 billion is what it "
+         f"would be worth today friends listen carefully {filler} please")
+    c = (f"Nobody tells you the secret truth about fear love and the biggest mistake "
+         f"everyone always makes when life changes {filler} here.")
+    w, t = _story(a, 8.0, step=0.5)
+    t += 6.0
+    w2, t = _story(b, t, step=0.5)
+    t += 6.0
+    w3, t = _story(c, t, step=0.5)
+    words = w + w2 + w3
+    print(f"  spans {w[0]['s']:.0f}-{w[-1]['e']:.0f} {w2[0]['s']:.0f}-{w2[-1]['e']:.0f} {w3[0]['s']:.0f}-{w3[-1]['e']:.0f}")
+    assert w[-1]["e"] - w[0]["s"] >= 20
+    assert w2[-1]["e"] - w2[0]["s"] >= 20
+    moments = find_moments(words, "en", np.zeros(int(t / 0.5) + 30), 0.5, None, n=3, dmin=20, dmax=60)
+    print(f"  windows {len(moments)}")
+    for m in moments:
+        print(f"   {m['start']:.1f}-{m['end']:.1f} {m['score_raw']} {m['text'][:80]!r}")
+    assert len(moments) == 3, [m["text"][:40] for m in moments]
+    blob = " ".join(m["text"] for m in moments)
+    assert "What good is security" in blob
+    assert "2008" in blob and "2009" in blob and "$200K" in blob and "$10" in blob
+    assert "ploplesy" not in blob.lower()
+    # snapping a too-short fragment must not delete the in-range window around it
+    moments2 = find_moments(words, "en", np.zeros(int(t / 0.5) + 30), 0.5, None, n=1, dmin=20, dmax=60)
+    assert len(moments2) == 1
+
+
+def test_fallback_fills_without_promo():
+    import numpy as np
+    filler = " ".join(f"word{i}x" for i in range(40))
+    strong = f"What good is security if you can see the secret truth about money {filler} today."
+    # Starts weak and does not finish the sentence: under MIN_RAW, but still real speech.
+    weak = f"and table chair paper morning coffee window garden pencil notebook {filler} quietly"
+    promo = "Please subscribe now and follow me on instagram for the secret link in the description today friends listen."
+    w, t = _story(strong, 5.0, step=0.48)
+    t += 8
+    w2, t = _story(weak, t, step=0.48)
+    t += 8
+    w3, t = _story(promo, t, step=0.5)
+    words = w + w2 + w3
+    moments = find_moments(words, "en", np.zeros(int(t / 0.5) + 30), 0.5, None, n=3, dmin=20, dmax=50)
+    texts = [m["text"] for m in moments]
+    print(f"  fallback n={len(moments)}")
+    for m in moments:
+        print(f"   raw {m['score_raw']} {m['text'][:70]!r}")
+    assert any("What good is security" in tx for tx in texts)
+    assert any("Table chair" in tx or "table chair" in tx.lower() for tx in texts)
+    assert any(m["score_raw"] < MIN_RAW for m in moments)
+    blob = " ".join(texts).lower()
+    assert "subscribe" not in blob and "instagram" not in blob
+    assert len(moments) == 2
+
+
+def test_allegro_hook_not_backreference():
+    """The shipped title was a backwards clause plus grammatical hashtags."""
+    bad = "Polegało to na tym, że każde przesyłek odebranych przez Allegro One."
+    good = "Allegro One daje drzewka za paczki."
+    ctx = "Sadzonki odbierasz razem z zamówieniem."
+    before_title = bad.rstrip(".")
+    before_tags = "#allegro #każde #przesyłek #sobie #shorts #viral #fyp #polska #dlaciebie"
+    m = {
+        "text": bad + " " + good + " " + ctx + " weź to sobie",
+        "sents": [bad, good, ctx],
+        "hook": bad,
+    }
+    title, cap, tags = title_and_tags(m, "pl", "Allegro One drzewka za paczki")
+    print(f"  before title {before_title!r}")
+    print(f"  before tags  {before_tags}")
+    print(f"  after title  {title!r}")
+    print(f"  after tags   {' '.join(tags)}")
+    print(f"  after cap    {cap!r}")
+    assert title and not title.lower().startswith("polegało")
+    assert "każde przesyłek" not in title.lower()
+    assert "drzewka" in title.lower() and "allegro" in title.lower()
+    low = [t.lower() for t in tags]
+    assert "#każde" not in low and "#sobie" not in low and "#przesyłek" not in low
+    assert "#allegro" in low
+    assert "#fyp" not in low and "#polska" not in low and "#dlaciebie" not in low
+    assert len([t for t in low if t in {"#shorts", "#viral", "#fyp", "#polska", "#dlaciebie", "#podcast"}]) <= 2
+    assert title in cap and ctx.rstrip(".") in cap
+    assert cap.strip() != title
+    # only the broken sentence: a topic line, not the clause
+    only = clip_title([bad], "pl", "Allegro One drzewka za paczki")
+    print(f"  topic-only   {only!r}")
+    assert only and not only.lower().startswith("polegało")
+    assert "allegro" in only.lower()
+    gta = _hashtags_for("GTA 6 przecieki")
+    assert "gta6" in gta
+
+
+def _hashtags_for(video_title):
+    from main import _hashtags
+    return [t[1:] for t in _hashtags("Nic tu nie ma naprawdę.", "pl", video_title)]
 
 
 def test_js_rating_matches():
