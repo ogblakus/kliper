@@ -42,10 +42,10 @@ def worker():
     while True:
         jid = q.get(); j = next((x for x in jobs if x["id"] == jid), None)
         if not j or j["status"] != "queued": continue  # deleted or cancelled while waiting
-        j.update(status="running", started=time.time(), stage="Pobieranie wideo…"); save()
+        j.update(status="running", started=time.time(), stage="Pobieranie filmu…"); save()
         log = open(LOGS / f"{jid}.log", "w", encoding="utf-8")
         if j.get("kind") == "rerender":
-            j["stage"] = "Renderuję ponownie…"; save()
+            j["stage"] = "Montuję ten klip jeszcze raz…"; save()
             cmd = [sys.executable, "-u", str(APP / "main.py"), "--rerender", j["video_id"], "--clip", str(j["clip"])]
         else:
             cmd = [sys.executable, "-u", str(APP / "main.py"), j["url"], "--n", str(j["n"]), "--lang", j["lang"], "--model", settings()["model"], "--preset", settings()["preset"]] + (["--min", str(j["min"]), "--max", str(j["max"])] if j.get("min") else [])
@@ -54,10 +54,10 @@ def worker():
         procs[jid] = p; last = ""
         for line in p.stdout:
             log.write(line); log.flush(); s = line.strip()
-            if "transcribe model" in s: j["stage"] = "Transkrypcja" + (" wybranych fragmentów (szybka ścieżka: napisy YouTube)…" if "regions=" in s else " (to trwa najdłużej)…")
-            elif "heatmap" in s: j["stage"] = "Szukam najlepszych momentów…"
+            if "transcribe model" in s: j["stage"] = "Transkrypcja — słucham nagrania" + (" (najpierw napisy z YouTube)…" if "regions=" in s else ". To trwa najdłużej…")
+            elif "heatmap" in s: j["stage"] = "Szukam fragmentów, które warto wyciąć…"
             elif m := re.search(r"render (\d+)/(\d+)", s): j.setdefault("render_started", time.time()); j["stage"] = f"Montuję klip {m[1]} z {m[2]}…"; j["progress"] = int(m[1]) - 1; j["total"] = int(m[2])
-            elif m := re.search(r"\[download\]\s+([\d.]+)%", s): j["stage"] = f"Pobieranie wideo… {float(m[1]):.0f}%"
+            elif m := re.search(r"\[download\]\s+([\d.]+)%", s): j["stage"] = f"Pobieranie filmu… {float(m[1]):.0f}%"
             if s: last = s
         p.wait(); j["finished"] = time.time(); procs.pop(jid, None)
         if j.get("status") == "cancelled": save(); continue
@@ -86,48 +86,104 @@ def authed(r: Request): return (not PW) or hmac.compare_digest(r.cookies.get("s"
 def need(r):
     if not authed(r): raise HTTPException(401)
 
-CSS = """*{box-sizing:border-box}body{font-family:-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:#0f1115;color:#eee}
-.w{max-width:760px;margin:auto;padding:16px}h1{font-size:22px}input,select,button{font-size:17px;padding:12px;border-radius:10px;border:1px solid #333;background:#1b1e25;color:#eee;width:100%}
-button{background:#ff3d6e;border:0;font-weight:700;cursor:pointer}button.s{background:#2b2f3a;width:auto;padding:8px 12px;font-size:14px}
-.row{display:flex;gap:10px}.row>*{flex:1}.card{background:#171a21;border-radius:14px;padding:14px;margin:12px 0}
-label{font-size:14px;color:#aaa;display:block;margin:10px 0 4px}video{width:100%;max-height:70vh;border-radius:10px;background:#000}
-.st{font-size:14px;color:#aaa}.bar{height:8px;background:#2b2f3a;border-radius:4px;overflow:hidden}.bar>div{height:100%;background:#ff3d6e}
-a{color:#ff7a9a}.btn{display:inline-block;background:#ff3d6e;color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:700}
-.tabs{display:flex;gap:8px;margin:8px 0}.tabs button{background:#2b2f3a}.tabs button.on{background:#ff3d6e}
-.res{display:flex;gap:12px;align-items:flex-start}.res img{width:168px;border-radius:10px;flex:none;aspect-ratio:16/9;object-fit:cover}
-.sc{background:#ff3d6e;border-radius:8px;padding:2px 8px;font-weight:700;font-size:14px}.ccb{background:#1f8f4e;border-radius:8px;padding:2px 8px;font-size:13px}
-.why{margin:6px 0 8px 18px;padding:0;font-size:14px;color:#ccc}.chk{display:flex;align-items:center;gap:8px;margin:12px 0;color:#ccc}.chk input{width:22px;height:22px}
-.info{position:relative;cursor:pointer;font-size:13px;color:#aaa;white-space:nowrap}.pop{display:none;position:absolute;z-index:9;left:0;top:22px;width:270px;background:#22262f;border:1px solid #3a3f4b;border-radius:10px;padding:8px 10px;color:#ddd;white-space:normal;box-shadow:0 6px 20px #0008}
-@media(hover:hover){.info:hover .pop{display:block}}.info.open .pop{display:block}.pop .r{display:flex;justify-content:space-between;gap:8px;padding:2px 0;font-size:13px}.pop span{color:#999}.pop .g{color:#7ee2a0}.pop .m{color:#aaa;font-weight:400}
-.warn{font-size:13px;color:#f5c26b;background:#2a2312;border-radius:10px;padding:10px}
-@media(max-width:520px){.res{flex-direction:column}.res img{width:100%}}
-.jh{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.ic{flex:none}.acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.steps{display:flex;flex-wrap:wrap;gap:4px;margin:8px 0}.steps span{font-size:12px;padding:3px 8px;border-radius:10px;background:#2b2f3a;color:#888}.steps .on{background:#ff3d6e;color:#fff}.steps .ok{background:#1f5f3a;color:#cfc}
-.err{background:#3a1518;border:1px solid #f66;border-radius:10px;padding:10px;margin:8px 0;word-break:break-word}
-.clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}.cap{font-size:14px;background:#0f1115;padding:8px;border-radius:8px;word-break:break-word}"""
+CSS = """*{box-sizing:border-box}
+:root{--bg:#12141a;--card:#1c2029;--text:#e8ebf2;--muted:#b7c0ce;--line:#3a4150;--input:#232833;--ink:#142033;--paper:#e7eefc;--badge:#f3d48a;--badge-ink:#231c0c;--ok:#b7ead4;--ok-bg:#1a3330;--warn:#f0e2c0;--warn-bg:#2a2618;--bad:#ffd5dc;--bad-bg:#3a2428}
+html{background:var(--bg)}
+body{font-family:"Segoe UI","Helvetica Neue",system-ui,sans-serif;font-size:17px;line-height:1.5;margin:0;background:var(--bg);color:var(--text)}
+.w{max-width:860px;margin:auto;padding:28px 20px 48px}
+h1{font-size:1.7rem;line-height:1.2;margin:0 0 4px;font-weight:650;letter-spacing:-.02em}
+h2,h3{font-size:1.05rem;line-height:1.35;margin:12px 0 4px;font-weight:650}
+.lede{color:var(--muted);margin:0 0 8px}
+input,select,textarea{font:inherit;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--input);color:var(--text);width:100%}
+input::placeholder,textarea::placeholder{color:#b3bdcc}
+button{font:inherit;font-weight:700;padding:12px 16px;border-radius:12px;border:0;background:var(--paper);color:var(--ink);width:100%;cursor:pointer}
+button:hover{background:#f5f8ff}
+button:disabled{opacity:.55;cursor:default}
+button.s{background:transparent;color:var(--text);border:1px solid #4c5568;width:auto;padding:8px 12px;font-size:15px;font-weight:600}
+button.s:hover{background:#262b36}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #c5d7ff;outline-offset:2px}
+.row{display:flex;gap:12px}.row>*{flex:1}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin:16px 0}
+label{font-size:15px;color:var(--muted);display:block;margin:14px 0 6px}
+video{width:100%;max-height:70vh;border-radius:12px;background:#000}
+.st{font-size:15px;color:var(--muted)}
+.bar{height:8px;background:#2a3140;border-radius:99px;overflow:hidden}
+.bar>div{height:100%;background:var(--paper)}
+a{color:#c5d7ff}
+.btn{display:inline-block;background:var(--paper);color:var(--ink);padding:10px 14px;border-radius:12px;text-decoration:none;font-weight:700}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid #4c5568;font-weight:600}
+.tabs{display:flex;gap:8px;margin:18px 0}
+.tabs button{width:auto;flex:1;background:transparent;color:var(--muted);border:1px solid var(--line)}
+.tabs button.on{background:var(--text);color:#141820;border-color:transparent}
+.res{display:flex;gap:14px;align-items:flex-start}
+.res img{width:168px;border-radius:12px;flex:none;aspect-ratio:16/9;object-fit:cover;background:#000}
+.sc{background:var(--badge);color:var(--badge-ink);border-radius:999px;padding:4px 10px;font-weight:800;font-size:14px}
+.ccb{background:var(--ok-bg);color:var(--ok);border-radius:999px;padding:4px 10px;font-size:14px}
+.why{margin:8px 0 12px 18px;padding:0;font-size:15px;color:var(--text)}
+.chk{display:flex;align-items:center;gap:8px;margin:12px 0;color:var(--text)}
+.chk input{width:22px;height:22px}
+.info{position:relative;cursor:pointer;font-size:15px;color:var(--muted);white-space:nowrap}
+.pop{display:none;position:absolute;z-index:9;left:0;top:24px;width:280px;background:#262b36;border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--text);white-space:normal;box-shadow:0 10px 28px #0008}
+@media(hover:hover){.info:hover .pop{display:block}}.info.open .pop{display:block}
+.pop .r{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:14px}
+.pop span{color:var(--muted)}.pop .g{color:var(--ok)}.pop .m{color:var(--muted);font-weight:400}
+.warn{font-size:15px;color:var(--warn);background:var(--warn-bg);border-radius:12px;padding:12px 14px}
+@media(max-width:520px){.res,.row{flex-direction:column}.res img{width:100%}.w{padding:18px 14px 36px}summary .s{display:block;margin:8px 0 0}}
+.jh{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.jh b{overflow-wrap:anywhere}
+.ic{flex:none}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px}
+.lead{margin:10px 0}
+.pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700;letter-spacing:.02em}
+.pill.wait{background:#2a3140;color:var(--muted)}
+.pill.run{background:var(--paper);color:var(--ink)}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.steps{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.steps span{font-size:13px;padding:4px 10px;border-radius:999px;background:#2a3140;color:var(--muted)}
+.steps .on{background:var(--paper);color:var(--ink)}
+.steps .ok{background:var(--ok-bg);color:var(--ok)}
+.err{background:var(--bad-bg);border:1px solid #6e3a42;border-radius:12px;padding:12px 14px;margin:10px 0;color:var(--bad);overflow-wrap:anywhere}
+.clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-top:14px}
+.clip{background:#171b24;border:1px solid var(--line);border-radius:14px;padding:12px}
+.thumb{position:relative;border-radius:12px;overflow:hidden;background:#0c0e13}
+.thumb video{width:100%;height:280px;object-fit:cover;border-radius:0;display:block}
+.badge{position:absolute;left:10px;top:10px;background:var(--badge);color:var(--badge-ink);font-weight:800;font-size:18px;line-height:1.2;padding:7px 12px;border-radius:999px}
+.clip h3{margin-top:12px}
+.meta{color:var(--text);font-size:15px;margin:0 0 8px}
+.rowbtns{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.capbox{margin-top:8px}
+.capbox summary{cursor:pointer;color:var(--muted);font-size:15px}
+.cap{font-size:15px;background:#12141a;padding:10px;border-radius:10px;overflow-wrap:anywhere;margin-top:8px}
+.empty h2{margin-top:0}
+details.card>summary,details.adv>summary{cursor:pointer;font-weight:650}
+details.adv{margin-top:8px}
+summary .s{margin-left:8px;vertical-align:middle}"""
 
 LOGIN = f"""<!doctype html><html lang=pl><meta name=viewport content="width=device-width,initial-scale=1"><title>Clipper</title><meta charset=utf-8><style>{CSS}</style>
-<div class=w><h1>🎬 Clipper – logowanie</h1><form method=post action=/login class=card><label>Hasło</label><input type=password name=pw autofocus>
+<div class=w><h1>Clipper</h1><p class=lede>Wpisz hasło, żeby robić klipy.</p><form method=post action=/login class=card><label>Hasło</label><input type=password name=pw autofocus>
 <p></p><button>Zaloguj</button>__ERR__</form></div>"""
 
 PAGE = f"""<!doctype html><html lang=pl><meta name=viewport content="width=device-width,initial-scale=1"><title>Clipper</title><meta charset=utf-8><style>{CSS}</style>
-<div class=w><h1>🎬 Clipper – shorty z YouTube</h1>
-<div class=tabs><button id=t1 class=on onclick="tab(1)">✂️ Klipy</button><button id=t2 onclick="tab(2)">🔎 Znajdź film</button></div>
-<div id=p2 style="display:none"><form id=ff class=card><label>Temat (albo wybierz niszę)</label><input name=topic id=topic placeholder="np. Mentzen wywiad, AI agenci, Lewandowski…">
+<div class=w><h1>Clipper</h1><p class=lede>Z YouTube robisz krótkie klipy. Wklej link albo znajdź film.</p>
+<div class=tabs><button id=t1 class=on onclick="tab(1)">Klipy</button><button id=t2 onclick="tab(2)">Znajdź film</button></div>
+<div id=p2 style="display:none"><form id=ff class=card><label>Temat albo nisza</label><input name=topic id=topic placeholder="np. Mentzen wywiad, AI agenci, Lewandowski…">
 <label>Nisza</label><select name=preset>__PRESETS__</select>
-<div class=row><div><label>Język</label><select name=lang><option value=pl>polski</option><option value=en>angielski</option></select></div>
-<div><label>Wiek filmu</label><select name=age><option value=7>ostatnie 7 dni</option><option value=30>ostatnie 30 dni</option><option value=365>ostatni rok</option></select></div></div>
+<label>Język</label><select name=lang><option value=pl>polski</option><option value=en>angielski</option></select>
+<details class=adv><summary>Więcej opcji</summary>
+<label>Wiek filmu</label><select name=age><option value=7>ostatnie 7 dni</option><option value=30>ostatnie 30 dni</option><option value=365>ostatni rok</option></select>
 <label>Minimum wyświetleń: <b id=mvl>20 tys.</b></label><input type=range id=mvr min=0 max=7 step=0.1 value=4.3 oninput=mvU() style="padding:0">
-<input type=hidden name=min_views id=mv value=20000><p class=st style="margin:2px 0">Suwak logarytmiczny 0 – 10 mln. Mniejsze filmy rzadko dają viralowe klipy.</p>
-<label class=chk><input type=checkbox name=cc value=1> tylko Creative Commons (bezpieczne)</label>
-<button id=fb>Szukaj 🔎</button><p class=st>Szukanie trwa zwykle 15–60 s (sprawdzam szczegóły ~15 najlepszych kandydatów). Wyniki są zapamiętywane na 6 h.</p>
-<p class=warn>⚠️ Klipowanie cudzych filmów bez zgody autora może skończyć się roszczeniem lub ostrzeżeniem o naruszeniu praw autorskich (copyright strike). Najbezpieczniej: filmy z licencją Creative Commons (🟢 CC) albo za zgodą twórcy.</p></form>
+<input type=hidden name=min_views id=mv value=20000><p class=st style="margin:2px 0">Suwak od 0 do 10 mln. Mniejsze filmy rzadko dają klipy, które się niosą.</p>
+<label class=chk><input type=checkbox name=cc value=1> tylko Creative Commons (bezpieczniejsze)</label>
+</details>
+<button id=fb>Szukaj</button><p class=st>Zwykle 15–60 sekund. Sprawdzam około 15 najlepszych filmów. Wynik pamiętam przez 6 godzin.</p>
+<p class=warn>Klipowanie cudzego filmu bez zgody autora może skończyć się roszczeniem albo ostrzeżeniem o prawach autorskich. Najbezpieczniej: licencja Creative Commons albo zgoda twórcy.</p></form>
 <div id=fres></div></div>
 <div id=p1><form id=f class=card><label>Link do filmu YouTube</label><input name=url id=url placeholder="https://www.youtube.com/watch?v=..." required inputmode=url>
 <div class=row><div><label>Liczba klipów</label><input name=n type=number min=1 max=15 value=5></div>
 <div><label>Język</label><select name=lang><option value=auto>automatycznie</option><option value=pl>polski</option><option value=en>angielski</option></select></div></div>
-<p></p><button>Zrób klipy ✂️</button><p class=st>Film 10–15 min to zwykle 2–4 minuty czekania. Zadania idą po kolei, jedno naraz.</p></form>
-<details class=card id=setc><summary><b>⚙️ Ustawienia</b> &nbsp;<button type=button class=s onclick="event.preventDefault();fetch('/api/open-folder',{{method:'POST'}})">📂 Otwórz folder z klipami</button></summary>
+<p></p><button>Zrób klipy</button><p class=st>Film na 10–15 minut to zwykle kilka minut czekania. Zadania idą po kolei, jedno naraz.</p></form>
+<details class=card id=setc><summary><b>Ustawienia zaawansowane</b> <button type=button class=s onclick="event.preventDefault();event.stopPropagation();fetch('/api/open-folder',{{method:'POST'}})">Otwórz folder z klipami</button></summary>
 <label>Jakość / szybkość</label><select id=s_preset onchange=estUpd()><option value=szybki>⚡ Szybki</option><option value=zbalansowany>⚖️ Zbalansowany (zalecany)</option><option value=dokladny>🎯 Dokładny (wolny)</option></select>
 <p class=st id=hwinfo></p>
 <label>Model rozpoznawania mowy (Whisper)</label><select id=s_model><option value=auto>automatycznie (wg komputera i presetu)</option><option value=base>base – najszybszy</option><option value=small>small – szybki</option><option value=medium>medium – dokładny</option><option value=large-v3>large-v3 – najlepszy, bardzo wolny bez GPU</option></select>
@@ -170,13 +226,13 @@ document.getElementById('ff').onsubmit=async e=>{{e.preventDefault();const b=fb;
   (d.results.length?'':'<div class=card>Brak wyników – zmniejsz minimum wyświetleń, wybierz 30 dni albo wyłącz filtr CC.</div>')+
   d.results.map((x,i)=>`<div class=card><div class=res><a href="${{x.url}}" target=_blank><img src="${{x.thumb}}" loading=lazy alt=""></a><div>
    <b>${{esc(x.title)}}</b><div class=st>${{esc(x.channel)}} · ${{x.views_h}} wyśw. · ${{ag(x.days)}} · ${{fd(x.duration)}}</div>
-   <p><span class=sc>score ${{x.score}}</span> <span class=info tabindex=0>ℹ️ statystyki${{pop(x)}}</span> ${{x.cc?'<span class=ccb>🟢 CC – bezpieczne</span>':''}}</p></div></div>
-   <b style="font-size:14px">Dlaczego:</b><ul class=why>${{x.why.map(w=>'<li>'+esc(w)+'</li>').join('')}}</ul>
-   <button onclick="mk(this,${{i}})">Zrób klipy ✂️</button></div>`).join('');
- }}catch(err){{fres.innerHTML='<div class=card>❌ '+esc(err.message)+'</div>'}}finally{{clearInterval(tk);b.disabled=false;b.textContent='Szukaj 🔎'}}}};
+   <p><span class=sc>ocena ${{x.score}}</span> <span class=info tabindex=0>statystyki${{pop(x)}}</span> ${{x.cc?'<span class=ccb>CC – bezpieczniejsze</span>':''}}</p></div></div>
+   <b>Dlaczego ten film</b><ul class=why>${{x.why.map(w=>'<li>'+esc(w)+'</li>').join('')}}</ul>
+   <button onclick="mk(this,${{i}})">Zrób klipy</button></div>`).join('');
+ }}catch(err){{fres.innerHTML='<div class=card>❌ '+esc(err.message)+'</div>'}}finally{{clearInterval(tk);b.disabled=false;b.textContent='Szukaj'}}}};
 async function mk(b,i){{const x=FR[i];const f=new FormData();f.append('url',x.url);f.append('n',5);f.append('lang',ff.lang.value);if(FC){{f.append('cmin',FC[0]);f.append('cmax',FC[1])}}
  b.disabled=true;const r=await fetch('/api/jobs',{{method:'POST',body:f}});if(!r.ok){{b.disabled=false;alert('Błąd');return}}
- b.textContent='✅ Dodano do kolejki – zobacz zakładkę Klipy';load()}}
+ b.textContent='Dodano do kolejki — zobacz zakładkę Klipy';load()}}
 </script>"""
 
 @app.get("/api/settings")
@@ -361,8 +417,8 @@ EDIT = """<!doctype html><html lang=pl><meta name=viewport content="width=device
 .wd.del input{text-decoration:line-through;opacity:.4}.wd.chg input{border-color:#ffcc00}.wd.low input{border-color:#ff7a3d}
 .wd.sp input{border:2px dashed #b77dff}.wd.fx input{border:2px solid #4fc3f7}.chips{display:block;line-height:1.2}.chip{display:inline-block;background:#3a2b55;color:#e6d6ff;border:0;border-radius:12px;padding:3px 8px;margin:2px 2px 0 0;font-size:13px;width:auto;cursor:pointer}
 .wd small{color:#777;font-size:11px;display:block;line-height:1;text-align:center}.x{background:none;border:0;color:#f66;width:auto;padding:2px 4px;font-size:15px}
-.ln{border-bottom:1px solid #222;padding:4px 0}.nud{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.nud button{width:auto;padding:8px 10px;font-size:15px;background:#2b2f3a}
-.nud b{min-width:70px;display:inline-block;text-align:center}.sticky{position:sticky;bottom:0;background:#0f1115;padding:10px 0}textarea{width:100%;font-size:16px;padding:10px;border-radius:10px;background:#1b1e25;color:#eee;border:1px solid #333}
+.ln{border-bottom:1px solid #222;padding:4px 0}.nud{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.nud button{width:auto;padding:8px 10px;font-size:15px;background:transparent;color:var(--text);border:1px solid #4c5568}
+.nud b{min-width:70px;display:inline-block;text-align:center}.sticky{position:sticky;bottom:0;background:var(--bg);padding:12px 0}textarea{width:100%}
 </style><div class=w><p><a href="/">← Wróć do listy</a></p><h1>✏️ Edycja klipu __N__</h1>
 <div class=card><video id=v controls playsinline preload=metadata></video><p class=st id=info></p></div>
 <div class=card><b>Początek i koniec klipu</b><p class=st>Czas w oryginalnym filmie. Po zmianie zapisz, aby zobaczyć nowe słowa.</p>
@@ -370,7 +426,7 @@ EDIT = """<!doctype html><html lang=pl><meta name=viewport content="width=device
 <div class=nud>Koniec: <button onclick="nud('end',-2)">−2s</button><button onclick="nud('end',-0.5)">−0.5</button><b id=en></b><button onclick="nud('end',0.5)">+0.5</button><button onclick="nud('end',2)">+2s</button></div></div>
 <div class=card><b>Napisy</b><p class=st>Popraw słowo, dotknij ✕ żeby usunąć je z napisów (dźwięk zostaje). Pomarańczowa ramka = Whisper nie był pewny. <span style="color:#b77dff">Fioletowa przerywana</span> = brak w słowniku – dotknij podpowiedź. <span style="color:#4fc3f7">Niebieska</span> = poprawione automatycznie (podpowiedź przywraca oryginał). Liczba = sekunda w klipie.</p><div id=words class=words></div></div>
 <div class=card><label>Tytuł</label><input id=title><label>Opis + hashtagi</label><textarea id=cap rows=4></textarea></div>
-<div class=sticky><button id=go onclick="save()">🎬 Renderuj ponownie</button><p class=st id=msg></p></div></div>
+<div class=sticky><button id=go onclick="save()">Renderuj ponownie</button><p class=st id=msg></p></div></div>
 <script>
 const VID='__VID__',N=__N__;let D,ch={},rr=null;
 const fmt=t=>{t=Math.max(0,t);const m=Math.floor(t/60);return m+':'+(t%60).toFixed(1).padStart(4,'0')};
@@ -389,12 +445,12 @@ function ed(i,val){const w=D.words[i];w.w=val;ch[w.k]={w:val,del:w.del};document
 function pick(i,val){const inp=document.getElementById('wi'+i);const m=D.words[i].w.match(/^([^\\p{L}\\d]*).*?([^\\p{L}\\d]*)$/u);
  const v=/[^\\p{L}\\d]$/u.test(val)?val:val+(m?m[2]:'');inp.value=v;ed(i,v);const el=document.getElementById('w'+i);el.classList.remove('sp','fx')}
 function del(i){const w=D.words[i];w.del=!w.del;ch[w.k]={w:w.w,del:w.del};document.getElementById('w'+i).classList.toggle('del',w.del)}
-function busy(b){go.disabled=b;go.textContent=b?'⏳ Renderuję… (stara wersja zostaje do końca)':'🎬 Renderuj ponownie'}
+function busy(b){go.disabled=b;go.textContent=b?'Renderuję… stara wersja zostaje do końca':'Renderuj ponownie'}
 async function save(){busy(true);msg.textContent='';
  const r=await fetch(`/api/clip/${VID}/${N}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start:D.start,end:D.end,title:title.value,caption:cap.value,words:ch})});
  if(!r.ok){busy(false);msg.textContent='Błąd: '+((await r.json()).detail||r.status);return}rr=(await r.json()).id;poll()}
 async function poll(){const js=await (await fetch('/api/jobs')).json();const j=js.find(x=>x.id==rr);
  if(!j||j.status=='queued'||j.status=='running'){msg.textContent=j?(j.status=='queued'?'W kolejce…':j.stage):'';return setTimeout(poll,2500)}
- if(j.status=='done'){msg.textContent='✅ Gotowe – nowa wersja poniżej.';await load();window.scrollTo(0,0)}else{busy(false);msg.textContent='❌ '+j.stage}}
+ if(j.status=='done'){msg.textContent='Gotowe. Nowa wersja jest powyżej.';await load();window.scrollTo(0,0)}else{busy(false);msg.textContent='Nie udało się: '+j.stage}}
 load();
 </script>"""

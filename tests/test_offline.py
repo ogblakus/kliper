@@ -3,7 +3,7 @@
 
 No YouTube and no network. Run: python tests/test_offline.py
 """
-import shutil, subprocess, sys, tempfile
+import json, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,9 +11,10 @@ sys.path.insert(0, str(ROOT / "app"))
 
 import finder
 from main import (
-    STOP, _drop_phrase_loops, _drop_repeat_segs, autosub_key, clip_rating, clip_title,
-    find_moments, keep_intervals, make_ass, score_window, sentences, src_to_out,
-    title_and_tags, write_summary,
+    STOP, _TRAIL, _drop_phrase_loops, _drop_repeat_segs, ass_time, autosub_key,
+    clean_speech, clear_clip_outputs, clip_rating, clip_title, find_moments,
+    keep_intervals, make_ass, score_window, sentences, src_to_out, title_and_tags,
+    write_summary,
 )
 
 
@@ -190,7 +191,7 @@ def test_title_from_sample_words():
     print(f"  sentences: {parts}")
     toks = title.split()
     assert old == "the nd"
-    assert len(toks) >= 3 and len(title) >= 15 and len(title) <= 60
+    assert len(toks) >= 3 and len(title) >= 15 and len(title) <= 70
     assert title[0].isupper()
     assert toks[0].lower().strip(".,!?…") not in STOP
     assert title.lower() not in STOP and not (len(toks) == 1 and toks[0].lower() in STOP)
@@ -206,7 +207,7 @@ def test_title_from_sample_words():
     long = "Nobody tells you the secret truth about money fear and the biggest mistake everyone always makes in life today."
     capped = clip_title([long], "en")
     print(f"  capped ({len(capped)} chars) -> {capped!r}")
-    assert 15 <= len(capped) <= 60 and len(capped.split()) >= 3
+    assert 15 <= len(capped) <= 70 and len(capped.split()) >= 3
     assert all(w in long.split() for w in capped.split())
     m = {"hook": parts[0], "text": " ".join(parts), "sents": parts}
     title2, cap, _tags = title_and_tags(m, "en")
@@ -353,6 +354,163 @@ def test_presets_language_neutral():
         assert "angielski" not in lab.lower(), lab
         assert not re.search(r"\b(PL|EN)\b", lab), lab
     print(f"  {len(finder.PRESETS)} presets, gta6 clip={g['clip']}, podcast_en -> podcasty")
+
+
+def test_stale_clip_files_removed():
+    d = Path(tempfile.mkdtemp())
+    keep = ["summary.json", "summary.md", "notes.txt", "clips_vid.zip"]
+    drop = ["clip_01.mp4", "clip_04.mp4", "clip_05.mp4", "clip_05.ass", "clip_05.jpg", "clip_02.srt"]
+    for name in keep + drop:
+        (d / name).write_bytes(b"old")
+    (d / "not_a_clip").mkdir()
+    gone = clear_clip_outputs(d)
+    left = sorted(p.name for p in d.iterdir())
+    print(f"  removed {sorted(gone)}")
+    print(f"  left {left}")
+    for name in drop:
+        assert not (d / name).exists(), name
+        assert name in gone
+    for name in keep + ["not_a_clip"]:
+        assert (d / name).exists(), name
+    assert clear_clip_outputs(d) == []
+
+
+def test_title_keeps_whole_sentence():
+    whole = "What good is security if you can see the whole room clearly now."
+    print(f"  whole len={len(whole)} -> {clip_title([whole], 'en')!r}")
+    assert 60 < len(whole) <= 70
+    assert clip_title([whole], "en") == whole
+    said = clip_title(["He said why don't you like interview them at all."], "en")
+    print(f"  said -> {said!r}")
+    assert said.lower().startswith("he said why")
+    assert not said.lower().startswith("said")
+    joined = clip_title(["What good is security", "if you can see the whole room now."], "en")
+    print(f"  joined fragments -> {joined!r}")
+    assert joined.lower().startswith("what good is security")
+    pl = clip_title(["Wyszło nam naprawdę dobrze, że jednak,"], "pl")
+    print(f"  trailing conjunctions -> {pl!r}")
+    assert not re.search(r"[,;]\s*$", pl)
+    last = re.sub(r"[.!?…]+$", "", pl.split()[-1].lower())
+    assert last not in {"i", "a", "ale", "że", "jednak", "więc", "bo", "and", "but", "so", "that", "because"}
+    assert "jednak" not in [w.lower().strip(".,!?…") for w in pl.split()]
+    assert pl.split()[-2].lower().strip(".,!?…") != "że"
+    long = ("What good is security if you can see every camera in this room and because "
+            "nobody tells you the secret truth about money fear today please listen carefully.")
+    cut = clip_title([long], "en")
+    end = re.sub(r"[.!?…,;:]+$", "", cut.split()[-1].lower())
+    print(f"  cut ({len(cut)}) ends {end!r} -> {cut!r}")
+    assert cut.lower().startswith("what good is security")
+    assert 15 <= len(cut) <= 70
+    assert end not in _TRAIL
+    assert "…" not in cut
+    assert all(w.strip(".,!?…") in long.replace(".", "").split() or w in long.split() for w in cut.split())
+
+
+def _burst(text, t, step=0.46):
+    words, marks = [], {}
+    for raw in text.split():
+        if raw == "|":
+            t += 0.95
+            continue
+        if raw == "||":
+            t += 0.6
+            continue
+        words.append(word(raw, round(t, 3), round(t + 0.2, 3)))
+        marks.setdefault(raw.strip(".,!?…"), round(t, 3))
+        t += step
+    return words, t, marks
+
+
+def test_clip_windows_follow_sentences():
+    import numpy as np
+    filler = " ".join(f"tok{i}x" for i in range(28))
+    s1 = ("What good is | security if you can see the secret truth about money fear love "
+          f"orroviewerенное .ploplesy and the biggest mistake everyone always makes {filler} right now.")
+    s2 = ("He || Said why don't you like interview them today when the secret truth about money "
+          f"and fear always changes people and the biggest mistake matters {filler} please.")
+    w1, t, m1 = _burst(s1, 3.0)
+    t += 1.5
+    w2, t, m2 = _burst(s2, t)
+    words = w1 + w2
+    print(f"  s1 {w1[0]['s']:.1f}-{w1[-1]['e']:.1f}s ({len(w1)}w) pause-before security@{m1['security']:.1f}")
+    print(f"  s2 {w2[0]['s']:.1f}-{w2[-1]['e']:.1f}s ({len(w2)}w) Said@{m2['Said']:.1f}")
+    assert w1[-1]["e"] - w1[0]["s"] >= 20
+    assert w2[-1]["e"] - w2[0]["s"] >= 20
+    moments = find_moments(words, "en", np.zeros(int(t / 0.5) + 30), 0.5, None, n=5, dmin=20, dmax=48)
+    described = []
+    for m in moments:
+        described.append((round(m["start"], 2), round(m["end"], 2), m["text"][:70], clip_title(m["sents"], "en")))
+    print("  moments:")
+    for row in described:
+        print("   ", row)
+    assert moments, "expected a clip on each full sentence"
+    texts = [m["text"] for m in moments]
+    assert any(tx.startswith("What good is") for tx in texts), texts
+    assert any(tx.startswith("He Said") or tx.startswith("He said") for tx in texts), texts
+    for tx in texts:
+        assert not tx.startswith("security"), tx
+        assert not tx.lower().startswith("said "), tx
+        low = tx.lower()
+        assert "orroviewer" not in low and "ploplesy" not in low and "www" not in low
+    what = next(m for m in moments if m["text"].startswith("What"))
+    he = next(m for m in moments if m["text"].startswith("He"))
+    assert what["start"] <= m1["security"] - 0.4
+    assert he["start"] <= m2["Said"] - 0.2
+    assert clip_title(what["sents"], "en").lower().startswith("what good is security")
+    assert clip_title(he["sents"], "en").lower().startswith("he said")
+    ordered = sorted(moments, key=lambda m: m["start"])
+    for a, b in zip(ordered, ordered[1:]):
+        assert a["end"] <= b["start"] + 0.05, (a["end"], b["start"])
+
+
+def test_summary_text_drops_garbage():
+    raw = "Hello orroviewerенное .ploplesy there www .com friend."
+    cleaned = clean_speech(raw)
+    print(f"  clean_speech -> {cleaned!r}")
+    assert "orroviewer" not in cleaned.lower() and "ploplesy" not in cleaned.lower()
+    assert "www" not in cleaned.lower() and "com" not in cleaned.lower().split()
+    assert cleaned.startswith("Hello") and "there" in cleaned and "friend" in cleaned
+    d = Path(tempfile.mkdtemp())
+    clip = {"file": "clip_01.mp4", "start": 1, "end": 20, "duration": 19, "crop_mode": "face",
+            "caption": "c", "hook": "Hello orroviewerенное there.", "title": "Hello there",
+            "score": 6, "score_raw": 1.0, "text": raw}
+    write_summary(d, {"title": "T", "url": "u", "language": "en", "clips": [clip]})
+    saved = json.loads((d / "summary.json").read_text(encoding="utf-8"))
+    text, hook = saved["clips"][0]["text"], saved["clips"][0]["hook"]
+    print(f"  summary text -> {text!r}")
+    print(f"  summary hook -> {hook!r}")
+    assert "orroviewer" not in text.lower() and "ploplesy" not in text.lower()
+    assert "Hello" in text and "there" in text and "friend" in text
+    assert "orroviewer" not in hook.lower() and hook.startswith("Hello") and "there" in hook
+
+
+def _ass_times(path):
+    out = []
+    for ln in Path(path).read_text(encoding="utf-8").splitlines():
+        if not ln.startswith("Dialogue"):
+            continue
+        bits = ln.split(",", 9)
+        def parse(ts):
+            h, m, s = ts.split(":")
+            return int(h) * 3600 + int(m) * 60 + float(s)
+        out.append((parse(bits[1]), parse(bits[2]), ln))
+    return out
+
+
+def test_captions_monotonic_and_inside_clip():
+    words = [word("second", 1.0, 1.3), word("first", 0.2, 0.5), word("third.", 1.6, 1.9)]
+    p = Path(tempfile.mkdtemp()) / "t.ass"
+    make_ass(words, [(0.0, 2.0)], p, "Arial", size=40, words_per=1)
+    times = _ass_times(p)
+    print("  " + " | ".join(f"{a:.2f}-{b:.2f}" for a, b, _ in times))
+    assert [a for a, _, _ in times] == sorted(a for a, _, _ in times)
+    for a, b, ln in times:
+        assert 0 <= a < b <= 2.0 + 1e-6, ln
+    blob = p.read_text(encoding="utf-8")
+    assert "FIRST" in blob and "SECOND" in blob and "THIRD" in blob
+    # same clock the editor shows: a word's caption does not run past the cut clip
+    shown = ass_time(src_to_out(1.9, [(0.0, 2.0)]))
+    assert shown.startswith("0:00:01.9")
 
 
 def test_js_rating_matches():
