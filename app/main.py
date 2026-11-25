@@ -310,20 +310,33 @@ PROMO = re.compile(
     re.I)
 MIN_RAW = -2.0  # below this (about 3/10) a window is not used to fill the requested clip count
 
-def _latin(c):
+# Years, prices, percents and times are speech. A dot only makes a token junk when it is
+# not a decimal (www.kondy.pl, .ploplesy). $200K / 1.5 / 3:45 / 10% stay.
+_NUMBER = re.compile(r"^[\$€£¥]?\d+(?:[.,:]\d+)*%?(?:[kmb])?$", re.I)
+
+def _script(c):
     o = ord(c)
-    return c.isascii() or 0x00C0 <= o <= 0x024F
+    if c.isascii() or 0x00C0 <= o <= 0x024F: return "lat"
+    if 0x0400 <= o <= 0x052F: return "cyr"
+    return "other"
 
 def _junk_token(w):
-    """Emoji, URLs, dotted garbage (.ploplesy) and mixed-script tokens are not speech."""
+    """Domains, URLs, @handles and mixed Latin/Cyrillic tokens. Numbers are kept."""
     raw = (w or "").strip().strip("\"'“”„«»()[]")
     if not raw: return True
     body = re.sub(r"[.!?…,;:]+$", "", raw).lstrip("-–—")
-    if "." in body: return True
-    letters = [c for c in body if c.isalpha()]
-    if not letters or any(not _latin(c) for c in letters): return True
+    if not body: return True
+    if "@" in body: return True
     low = re.sub(r"[^\w]", "", body.lower())
-    return low in {"www", "http", "https", "com", "youtube"}
+    if low in {"www", "http", "https", "com", "youtube"} or re.search(r"https?://|www\.", body, re.I):
+        return True
+    if _NUMBER.fullmatch(body): return False
+    if "." in body or "/" in body: return True  # domain, path, .ploplesy — not a decimal
+    letters = [c for c in body if c.isalpha()]
+    if not letters and not any(c.isdigit() for c in body): return True  # emoji, bare punctuation
+    kinds = {_script(c) for c in letters}
+    if "lat" in kinds and "cyr" in kinds: return True
+    return False
 
 def _median_wps(words, bucket=20.0):
     if not words: return 2.0
@@ -466,24 +479,58 @@ def clip_rating(sc):
     """Raw heuristic sum -> integer 1–10 (5 is a neutral clip)."""
     return int(max(1, min(10, round(5 + 0.6 * sc))))
 
-def _fit_sentence_window(sents, a, b, dmin, dmax, use_hard):
-    """Grow (or shrink) a window so it starts and ends on a sentence, inside min/max."""
+def _fit_sentence_window(sents, a, b, dmin, dmax, use_hard=True):
+    """Nudge edges onto a sentence boundary. Never drop a window that already fits min/max.
+
+    A fragment shorter than dmin can be pulled in (so a clip still starts at "What").
+    A neighbouring sentence that is already long enough to be its own clip is left alone.
+    """
     def dur(i, j):
         return sents[j]["e"] - sents[i]["s"]
+    def one(i):
+        return sents[i]["e"] - sents[i]["s"]
+    orig = (a, b)
+    orig_ok = dmin <= dur(a, b) <= dmax
+    if dur(a, b) > dmax:
+        return None
+    aa, bb = a, b
     if use_hard:
-        while a > 0 and not sents[a]["hard_start"] and dur(a - 1, b) <= dmax:
-            a -= 1
-        while b + 1 < len(sents) and not sents[b]["hard_end"] and dur(a, b + 1) <= dmax:
-            b += 1
-        while a < b and not sents[a]["hard_start"] and dur(a + 1, b) >= dmin:
-            a += 1
-        while b > a and not sents[b]["hard_end"] and dur(a, b - 1) >= dmin:
-            b -= 1
-    if dur(a, b) < dmin or dur(a, b) > dmax:
-        return None
-    if not (sents[a]["start_ok"] and sents[b]["end_ok"]):
-        return None
-    return a, b
+        while aa > 0 and not sents[aa]["hard_start"] and one(aa - 1) < dmin and dur(aa - 1, bb) <= dmax:
+            aa -= 1
+        # A window that already ends a sentence and is long enough stays put.
+        # Pulling in the next short fragment (an outro, a promo) must not replace it.
+        if dur(aa, bb) < dmin or not sents[bb]["end_ok"]:
+            while bb + 1 < len(sents) and not sents[bb]["hard_end"] and one(bb + 1) < dmin and dur(aa, bb + 1) <= dmax:
+                bb += 1
+    if dur(aa, bb) < dmin:
+        while bb + 1 < len(sents) and dur(aa, bb) < dmin and dur(aa, bb + 1) <= dmax:
+            bb += 1
+        while aa > 0 and dur(aa, bb) < dmin and dur(aa - 1, bb) <= dmax:
+            aa -= 1
+    if dmin <= dur(aa, bb) <= dmax:
+        return aa, bb
+    if orig_ok:
+        return orig
+    return None
+
+def _plain_title(parts):
+    """Last-resort line when a non-junk window has no polished sentence. Still never promo."""
+    speech = clean_speech(" ".join(p for p in parts if p))
+    if not speech or PROMO.search(speech):
+        return ""
+    words = [w for w in speech.split() if not _is_lead_fill(w)]
+    _strip_trail(words)
+    phrase = _shorten_phrase(" ".join(words))
+    bits = [w for w in phrase.split() if w]
+    _strip_trail(bits)
+    if bits:
+        bits[-1] = re.sub(r"[,;:]+$", "", bits[-1])
+    phrase = " ".join(b for b in bits if b).strip()
+    if len(phrase) < 15 or len(bits) < 3 or PROMO.search(phrase):
+        return ""
+    if phrase.lower().strip(" .") in {"best spoken moment", "najlepszy moment filmu"}:
+        return ""
+    return _cap_first(phrase)
 
 def find_moments(words, lang, loud, hop, heat, n, dmin=20, dmax=60, regions=None):
     sents = sentences(words)
@@ -495,37 +542,63 @@ def find_moments(words, lang, loud, hop, heat, n, dmin=20, dmax=60, regions=None
     cands, seen = [], set()
     for a in range(len(sents)):
         for b in range(a, len(sents)):
-            if sents[b]["e"] - sents[a]["s"] > dmax:
+            raw_d = sents[b]["e"] - sents[a]["s"]
+            if raw_d > dmax:
                 break
             fit = _fit_sentence_window(sents, a, b, dmin, dmax, use_hard)
-            if not fit or fit in seen:
-                continue
-            seen.add(fit)
-            a2, b2 = fit
-            if not inreg(sents[a2]["s"], sents[b2]["e"]):
-                continue
-            sc, why = score_window(sents, a2, b2, words, lang, loud, hop, heat, dur_total, rate)
-            if sc <= -50 or sc < MIN_RAW:
-                continue  # failed filter, or too weak to pad the list
-            cands.append((sc, a2, b2, why))
-    cands.sort(key=lambda c: -c[0]); picked = []
-    for c in cands:
-        a2, b2 = c[1], c[2]
+            raw_span = (a, b) if dmin <= raw_d <= dmax else None
+
+            def _add(span):
+                if not span or not inreg(sents[span[0]]["s"], sents[span[1]]["e"]):
+                    return "skip"
+                if span in seen:
+                    return "seen"
+                seen.add(span)
+                sc, why = score_window(sents, span[0], span[1], words, lang, loud, hop, heat, dur_total, rate)
+                cands.append((sc, span[0], span[1], why))
+                return sc
+
+            # Snap first. A mid-sentence slice is kept only when the snap is missing or junk,
+            # so it cannot outrank the full sentence or delete a good window.
+            sc_fit = _add(fit)
+            if raw_span and raw_span != fit and sc_fit != "seen" and (sc_fit == "skip" or (isinstance(sc_fit, float) and sc_fit <= -50)):
+                _add(raw_span)
+    cands.sort(key=lambda c: -c[0])
+    picked = []
+
+    def _take(c, fill):
+        sc, a2, b2, why = c
+        if sc <= -50:
+            return False  # promo, loop, or too little speech — never used as filler
+        if not fill and sc < MIN_RAW:
+            return False
         s, e = sents[a2]["s"], sents[b2]["e"]
         if not all(e <= p["start"] - 1 or s >= p["end"] + 1 for p in picked):
-            continue
+            return False
         parts = [clean_speech(sents[k]["text"]) for k in range(a2, b2 + 1)]
         parts = [p for p in parts if p]
-        if not parts or not clip_title(parts, lang):
-            continue  # no real sentence: skip, don't invent a title
-        i0, i1 = sents[a2]["i0"], sents[b2]["i1"]
-        bs, be = clip_bounds(words, i0, i1)
+        if not parts:
+            return False
+        title = clip_title(parts, lang) or (_plain_title(parts) if fill else "")
+        if not title:
+            return False
+        bs, be = clip_bounds(words, sents[a2]["i0"], sents[b2]["i1"])
         if any(not (be <= p["start"] + 0.05 or bs >= p["end"] - 0.05) for p in picked):
-            continue
-        picked.append({"start": bs, "end": be, "score": clip_rating(c[0]), "score_raw": round(c[0], 2),
-                       "why": c[3], "hook": parts[0], "text": clean_speech(" ".join(parts)), "sents": parts})
+            return False
+        picked.append({"start": bs, "end": be, "score": clip_rating(sc), "score_raw": round(sc, 2),
+                       "why": why, "hook": parts[0], "text": clean_speech(" ".join(parts)), "sents": parts,
+                       "title": title})
+        return True
+
+    for c in cands:
         if len(picked) >= n:
             break
+        _take(c, fill=False)
+    if len(picked) < n:
+        for c in cands:
+            if len(picked) >= n:
+                break
+            _take(c, fill=True)
     return picked
 
 def _cap_first(s):
@@ -636,20 +709,157 @@ def _complete_sentences(parts):
         out.append(" ".join(buf))
     return out
 
-def _pick_title(parts, lang):
+# A sentence can be grammatical and still be a bad short title: it only points at
+# something said earlier ("Polegało to na tym, że…", "He said…").
+_BAD_LEADS = (
+    "polegało to na tym, że", "polegało to na tym że", "polegało to na tym",
+    "to znaczy, że", "to znaczy że", "to znaczy",
+    "to jest", "to było", "to byl",
+    "it was", "it is", "it's", "that's", "that is", "this is",
+    "he said that", "he said", "she said that", "she said", "they said that", "they said", "i said",
+    "powiedział, że", "powiedziała, że", "powiedział że", "powiedziała że",
+    "natomiast",
+)
+_BAD_ONE = {"and", "but", "so", "because", "ale", "więc", "że", "ze", "bo", "natomiast", "czyli", "oraz", "albo"}
+_DANGLING = {"to", "tym", "tego", "tej", "it", "this", "that", "he", "she", "they", "on", "ona", "ono", "oni"}
+# Grammatical words that are not hashtags. "przesyłek" is the inflected filler from the
+# Allegro example, not the topic of the clip.
+_GRAM = _LEAD | {
+    "każde", "każda", "każdy", "każdą", "każdym", "sobie", "przez", "żeby", "odebranych",
+    "odebrane", "odebrany", "przesyłek", "polegało", "polega", "natomiast", "właśnie", "daje", "dają",
+    "jakby", "jeśli", "kiedy", "gdzie", "które", "który", "która", "potem", "wtedy", "razem",
+}
+_GENERIC_TAGS = ("#shorts", "#viral")
+
+def _peel_lead(text):
+    """Drop a lead-in that cannot open a short. Returns (core, peeled)."""
+    raw = re.sub(r"\s+", " ", text or "").strip()
+    low = raw.lower()
+    for p in _BAD_LEADS:
+        if low == p or low.startswith(p + " ") or low.startswith(p + ","):
+            return raw[len(p):].lstrip(" ,"), True
+    bits = raw.split(None, 1)
+    if not bits:
+        return "", True
+    first, rest = bits[0], bits[1] if len(bits) > 1 else ""
+    key = norm(first)
+    if key in _BAD_ONE or (key in {"i", "a"} and first[:1].islower()):
+        return rest, True
+    if key == "i" and rest and norm(rest.split()[0]) in {"każde", "każda", "każdy", "to", "tym", "tego", "że", "więc"}:
+        return rest, True
+    return raw, False
+
+def _bare_word(w):
+    return (w or "").strip(".,;:!?…\"'“”„«»()[]")
+
+def _mid_names(text):
+    """Brand and person names. A capital word that only opens a sentence is not a name."""
+    words = re.sub(r"\s+", " ", text or "").split()
+    names = []
+    i = 0
+    while i < len(words):
+        bare = _bare_word(words[i])
+        sent_start = i == 0 or _sent_punct(words[i - 1])
+        nxt = _bare_word(words[i + 1]) if i + 1 < len(words) else ""
+        if bare[:1].isupper() and len(bare) >= 2 and (not sent_start or nxt[:1].isupper()):
+            chunk = [bare]
+            j = i + 1
+            while j < len(words):
+                nw = _bare_word(words[j])
+                if not nw[:1].isupper() or len(nw) < 2:
+                    break
+                chunk.append(nw)
+                j += 1
+            if not (len(chunk) == 1 and norm(chunk[0]) in _GRAM):
+                names.append(" ".join(chunk))
+            i = j
+            continue
+        i += 1
+    return names
+
+def _hook_sentence(text, lang):
+    """A title sentence that can stand alone. Empty when it only refers backwards."""
+    core = clean_speech(text)
+    peeled = True
+    while core and peeled:
+        core, peeled = _peel_lead(core)
+    if not core:
+        return ""
+    words = core.split()
+    head = norm(words[0])
+    if head in {"każde", "każda", "każdy"} and not re.search(r"\d", words[1] if len(words) > 1 else ""):
+        return ""  # "każde przesyłek…" without the number is a fragment
+    if head in {"what", "why", "how", "who", "czy", "dlaczego", "jak", "co", "gdzie", "kiedy"} and len(words) < 5:
+        return ""
+    if head in _DANGLING and not re.search(r"\d", core) and not _mid_names(core):
+        return ""
+    return clean_title(core)
+
+def _content_words(text):
+    freq = {}
+    for w in re.findall(r"[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż0-9$%]+", text or ""):
+        t = norm(w)
+        if len(t) < 4 or t in _GRAM or t.isdigit():
+            continue
+        freq[t] = freq.get(t, 0) + 1
+    return [k for k, _ in sorted(freq.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+def _topic_title(parts, lang, video_title=""):
+    """No standalone sentence: a short line from names and topic words."""
+    blob = clean_speech(" ".join(parts))
+    names = _mid_names(blob) or _mid_names(video_title or "")
+    words = []
+    if names:
+        words.append(names[0])
+    skip = set()
+    if names:
+        skip = {norm(x) for x in names[0].split()}
+    for src in (video_title or "", blob):
+        for w in _content_words(src):
+            if w in skip or any(w in norm(n) for n in words):
+                continue
+            words.append(w)
+            if len(words) >= 3:
+                break
+        if len(words) >= 3:
+            break
+    if not words:
+        return ""
+    if lang == "pl" and len(words) > 1:
+        phrase = words[0] + " i " + " i ".join(words[1:])
+    else:
+        phrase = " ".join(words)
+    phrase = _shorten_phrase(phrase, TITLE_MAX)
+    return phrase[:1].upper() + phrase[1:] if phrase else ""
+
+def _pick_title(parts, lang, video_title=""):
     parts = _complete_sentences(parts)
     if not parts:
         return "", ""
-    order = sorted(range(len(parts)), key=lambda i: (sent_strength(parts[i], lang), -i), reverse=True)
-    for i in order:
-        t = clean_title(parts[i])
-        if t:
-            return t, parts[i]
+    scored = []
+    for i, p in enumerate(parts):
+        t = _hook_sentence(p, lang)
+        if not t:
+            continue
+        sc = sent_strength(t, lang)
+        if re.search(r"\d", t):
+            sc += 3
+        if t.rstrip().endswith("?"):
+            sc += 2
+        if _mid_names(p):
+            sc += 2
+        scored.append((sc, -i, t, p))
+    if scored:
+        scored.sort(reverse=True)
+        return scored[0][2], scored[0][3]
+    topic = _topic_title(parts, lang, video_title)
+    if topic and not PROMO.search(topic):
+        return topic, " ".join(parts)
     return "", ""
 
-def clip_title(parts, lang="en"):
-    """Meaningful phrase from the clip's sentences. Never a lone stopword."""
-    return _pick_title(parts, lang)[0]
+def clip_title(parts, lang="en", video_title=""):
+    """A hook that stands alone, or a short topic line. Never a lone stopword."""
+    return _pick_title(parts, lang, video_title)[0]
 
 def _clip_parts(m):
     parts = [s for s in (m.pop("sents", None) or []) if str(s).strip()]
@@ -658,20 +868,105 @@ def _clip_parts(m):
     parts = [p for p in re.split(r"(?<=[.!?…])\s+", blob) if p.strip()]
     return parts or ([blob] if blob else [])
 
-def title_and_tags(m, lang):
+def _tag_token(word):
+    return re.sub(r"[^a-z0-9ąćęłńóśźż]", "", norm(word))
+
+def _hashtags(text, lang, video_title=""):
+    """Names and topic words only, plus at most two generic tags. #gta6 from 'GTA 6'."""
+    found = []
+    def add(tok):
+        tok = _tag_token(tok)
+        if not tok or tok in _GRAM or tok in found:
+            return
+        if len(tok) < 4 and not tok[-1:].isdigit():
+            return
+        found.append(tok)
+    def pairs(src, names_only):
+        words = re.findall(r"[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż0-9]+", src or "")
+        i = 0
+        while i < len(words):
+            if i + 1 < len(words) and words[i].isalpha() and words[i + 1].isdigit():
+                add(words[i] + words[i + 1])
+                i += 2
+                continue
+            if not names_only or (words[i][:1].isupper() and len(words[i]) >= 4):
+                add(words[i])
+            i += 1
+    for name in _mid_names(text) + _mid_names(video_title or ""):
+        for bit in name.split():
+            add(bit)
+    pairs(video_title or "", names_only=False)
+    # video-title topic tags are capped later; window words fill the rest by frequency
+    freq = {}
+    for w in re.findall(r"[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż0-9]+", text or ""):
+        t = _tag_token(w)
+        if len(t) >= 4 and t not in _GRAM:
+            freq[t] = freq.get(t, 0) + 1
+    for t, _n in sorted(freq.items(), key=lambda kv: (-kv[1], kv[0])):
+        if t.endswith(("esz", "asz", "isz")):
+            continue  # 2nd-person verbs ("odbierasz") are not topic tags
+        add(t)
+        if len(found) >= 4:
+            break
+    # 1–2 tags that came from the video title, then other topic tags, then two generics.
+    video_set = set()
+    vw = re.findall(r"[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż0-9]+", video_title or "")
+    i = 0
+    while i < len(vw):
+        if i + 1 < len(vw) and vw[i].isalpha() and vw[i + 1].isdigit():
+            video_set.add(_tag_token(vw[i] + vw[i + 1]))
+            i += 2
+            continue
+        video_set.add(_tag_token(vw[i]))
+        i += 1
+    from_title = [t for t in found if t in video_set][:2]
+    rest = [t for t in found if t not in from_title]
+    tags = ["#" + t for t in (from_title + rest)[:4]]
+    for g in _GENERIC_TAGS:
+        if len([x for x in tags if x in _GENERIC_TAGS]) >= 2:
+            break
+        if g not in tags:
+            tags.append(g)
+    return tags
+
+def _context_sentence(parts, title):
+    """One sentence from the window that is not the title and not a backwards reference."""
+    title_key = re.sub(r"\W+", "", (title or "").lower())
+    cands = []
+    for p in _complete_sentences(parts):
+        t = clean_speech(p)
+        if not t or PROMO.search(t):
+            continue
+        if _hook_sentence(p, "en") == "" and _peel_lead(t)[1]:
+            continue
+        key = re.sub(r"\W+", "", t.lower())
+        if not key or key == title_key:
+            continue
+        cands.append(_shorten_phrase(t, 120).rstrip(" ,;"))
+    if not cands:
+        return ""
+    cands.sort(key=lambda s: (bool(re.search(r"\d", s)) + bool(_mid_names(s)), len(s)), reverse=True)
+    return cands[0]
+
+def title_and_tags(m, lang, video_title=""):
     if m.get("text"):
         m["text"] = clean_speech(m["text"])
-    title, src = _pick_title(_clip_parts(m), lang)
-    if not title: return "", "", []
+    parts = _clip_parts(m)
+    kept = m.get("title") or ""
+    title, src = _pick_title(parts, lang, video_title)
+    if not title:
+        title, src = kept, m.get("hook") or kept
+    if not title or PROMO.search(title):
+        return "", "", []
     m["hook"] = clean_speech(src or title)
-    toks = [norm(t) for t in m["text"].split() if not _junk_token(t)]
-    freq = {}
-    for t in toks:
-        if len(t) > 4 and t not in STOP and t not in EXTRA_STOP and not t.isdigit(): freq[t] = freq.get(t, 0) + 1
-    kws = [k for k, _ in sorted(freq.items(), key=lambda x: -x[1])[:4]]
-    base = ["#shorts", "#viral", "#fyp"] + (["#polska", "#dlaciebie"] if lang == "pl" else ["#podcast"])
-    tags = ["#" + k for k in kws] + base
-    return title, f"{title} {' '.join(tags)}", tags
+    tags = _hashtags(m.get("text") or src or "", lang, video_title)
+    ctx = _context_sentence(parts or [m.get("text") or ""], title)
+    cap_bits = [title]
+    if ctx and re.sub(r"\W+", "", ctx.lower()) != re.sub(r"\W+", "", title.lower()):
+        cap_bits.append(ctx)
+    if tags:
+        cap_bits.append(" ".join(tags))
+    return title, "\n".join(cap_bits), tags
 
 # ---------------------------------------------------------------- optional LLM rerank
 def llm_available():
@@ -942,7 +1237,7 @@ def main():
             log("spellcheck skipped:", e)
     kept = []
     for m in moments:
-        m["title"], m["caption"], m["tags"] = title_and_tags(m, lang)
+        m["title"], m["caption"], m["tags"] = title_and_tags(m, lang, meta.get("title") or "")
         if m["title"]: kept.append(m)
         else: log("skip clip without a title", round(m["start"], 1))
     moments = kept
