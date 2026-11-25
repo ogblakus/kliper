@@ -279,6 +279,24 @@ STOP = set("the a an and or but so to of in on at for with is are was were be be
 EXTRA_STOP = set("then those there's there these they're that's what's it's i've i'm don't didn't going gonna because about would could should which where while every something thing things people really actually right yeah okay jest żeby jakby właśnie wtedy który która które tutaj teraz bardzo jeszcze wszystko trochę mówi".split())
 _LEAD = STOP | EXTRA_STOP | WEAK_START
 _CONJ = {"aby", "że", "ze", "and", "that", "but", "or", "nor", "because", "which", "oraz", "albo"}
+# Fillers/articles/conjunctions that are not the start of a sentence. Pronouns and
+# question words (What, He, co, jak…) stay, so a title is not cut mid-thought.
+_LEAD_FILL = {
+    "um", "uh", "erm", "hmm", "mm", "uhh", "umm", "like", "yeah", "yep", "well", "ok", "okay",
+    "eee", "yyy", "ehm",
+    "the", "an", "a",
+    "and", "but", "or", "so",
+    "ale", "więc", "bo", "że", "ze", "aby", "oraz", "albo",
+}
+# Stripped from the end after punctuation is gone, repeatedly (PL + EN).
+_TRAIL = _CONJ | {
+    "i", "a", "ale", "że", "ze", "jednak", "więc", "bo", "aby", "oraz", "albo", "czyli",
+    "and", "but", "so", "that", "because", "or", "nor", "which", "while", "although", "though",
+    "um", "uh", "like", "yeah", "just", "also", "then", "eee", "yyy", "to", "if", "no",
+}
+TITLE_MAX = 70
+_CLIP_FILE = re.compile(r"^clip_\d+\.", re.I)
+_SENT_END = re.compile(r"[.!?…][\"'”»)\]]*$")
 # Promo / end-card / URL. A window that matches is rejected, not merely scored down.
 PROMO = re.compile(
     r"follow\s+(?:me|us)|subscri\w*|subskry\w*|obserwuj\w*|"
@@ -330,24 +348,46 @@ def _repetitive(toks):
             i += 1
     return False
 
+def _sent_punct(text):
+    return bool(_SENT_END.search((text or "").strip()))
+
 def sentences(words):
-    out, cur = [], []
+    """Split on punctuation, a capitalized segment start, or a real pause.
+
+    hard_end / hard_start mark punctuation boundaries. A pause or a segment start
+    is only a soft edge: find_moments grows the window back to punctuation when
+    the preset length still allows it.
+    """
+    if not words:
+        return []
+    groups = []
+    cur = []
     for i, w in enumerate(words):
         cur.append(i)
-        gap = words[i+1]["s"] - w["e"] if i + 1 < len(words) else 9
-        nxt = words[i+1]["w"] if i + 1 < len(words) else ""
-        punct = re.search(r"[.!?…]$", w["w"]) and (gap >= 0.12 or nxt[:1].isupper())
-        if punct or gap > 0.8 or (len(cur) > 60 and gap > 0.35):
-            out.append(cur); cur = []
-    if cur: out.append(cur)
+        if i + 1 >= len(words):
+            groups.append((cur, "punct" if _sent_punct(w["w"]) else "end"))
+            break
+        gap = words[i + 1]["s"] - w["e"]
+        nxt = words[i + 1]["w"].strip().lstrip("\"'“”„«»(")
+        punct = _sent_punct(w["w"])
+        cap = bool(nxt[:1].isupper())
+        if punct or gap > 0.8 or (cap and gap >= 0.45) or (len(cur) > 60 and gap > 0.35):
+            reason = "punct" if punct else ("seg" if cap and gap >= 0.45 else "gap")
+            groups.append((cur, reason))
+            cur = []
     res = []
-    for c in out:
-        i1 = c[-1]; gap = words[i1+1]["s"] - words[i1]["e"] if i1 + 1 < len(words) else 9
-        clean = bool(re.search(r"[.!?…]$", words[i1]["w"])) and gap >= 0.12 or gap >= 0.5
-        res.append({"i0": c[0], "i1": i1, "s": words[c[0]]["s"], "e": words[i1]["e"], "end_ok": clean,
-                    "text": " ".join(words[j]["w"] for j in c)})
+    for idxs, reason in groups:
+        i1 = idxs[-1]
+        text = " ".join(words[j]["w"] for j in idxs)
+        hard_end = _sent_punct(words[i1]["w"]) or _sent_punct(text)
+        res.append({
+            "i0": idxs[0], "i1": i1, "s": words[idxs[0]]["s"], "e": words[i1]["e"],
+            "end_ok": hard_end or reason in ("seg", "gap", "end"), "hard_end": hard_end,
+            "text": text,
+        })
     for k, x in enumerate(res):
-        x["start_ok"] = k == 0 or res[k-1]["end_ok"]
+        x["hard_start"] = k == 0 or res[k - 1]["hard_end"]
+        x["start_ok"] = k == 0 or res[k - 1]["end_ok"]
     return res
 
 def norm(t): return re.sub(r"[^\wąćęłńóśźż']", "", t.lower())
@@ -426,31 +466,66 @@ def clip_rating(sc):
     """Raw heuristic sum -> integer 1–10 (5 is a neutral clip)."""
     return int(max(1, min(10, round(5 + 0.6 * sc))))
 
+def _fit_sentence_window(sents, a, b, dmin, dmax, use_hard):
+    """Grow (or shrink) a window so it starts and ends on a sentence, inside min/max."""
+    def dur(i, j):
+        return sents[j]["e"] - sents[i]["s"]
+    if use_hard:
+        while a > 0 and not sents[a]["hard_start"] and dur(a - 1, b) <= dmax:
+            a -= 1
+        while b + 1 < len(sents) and not sents[b]["hard_end"] and dur(a, b + 1) <= dmax:
+            b += 1
+        while a < b and not sents[a]["hard_start"] and dur(a + 1, b) >= dmin:
+            a += 1
+        while b > a and not sents[b]["hard_end"] and dur(a, b - 1) >= dmin:
+            b -= 1
+    if dur(a, b) < dmin or dur(a, b) > dmax:
+        return None
+    if not (sents[a]["start_ok"] and sents[b]["end_ok"]):
+        return None
+    return a, b
+
 def find_moments(words, lang, loud, hop, heat, n, dmin=20, dmax=60, regions=None):
-    sents = sentences(words); dur_total = words[-1]["e"]; rate = _median_wps(words)
+    sents = sentences(words)
+    if not sents:
+        return []
+    dur_total = words[-1]["e"]; rate = _median_wps(words)
+    use_hard = any(s["hard_end"] for s in sents)
     inreg = lambda s, e: not regions or any(s >= a + 0.3 and e <= b - 0.3 for a, b in regions)
-    cands = []
+    cands, seen = [], set()
     for a in range(len(sents)):
         for b in range(a, len(sents)):
-            D = sents[b]["e"] - sents[a]["s"]
-            if D > dmax: break
-            if D < dmin: continue
-            if not (sents[a]["start_ok"] and sents[b]["end_ok"]): continue
-            if not inreg(sents[a]["s"], sents[b]["e"]): continue
-            sc, why = score_window(sents, a, b, words, lang, loud, hop, heat, dur_total, rate)
-            if sc <= -50 or sc < MIN_RAW: continue  # failed filter, or too weak to pad the list
-            cands.append((sc, a, b, why))
+            if sents[b]["e"] - sents[a]["s"] > dmax:
+                break
+            fit = _fit_sentence_window(sents, a, b, dmin, dmax, use_hard)
+            if not fit or fit in seen:
+                continue
+            seen.add(fit)
+            a2, b2 = fit
+            if not inreg(sents[a2]["s"], sents[b2]["e"]):
+                continue
+            sc, why = score_window(sents, a2, b2, words, lang, loud, hop, heat, dur_total, rate)
+            if sc <= -50 or sc < MIN_RAW:
+                continue  # failed filter, or too weak to pad the list
+            cands.append((sc, a2, b2, why))
     cands.sort(key=lambda c: -c[0]); picked = []
     for c in cands:
-        s, e = sents[c[1]]["s"], sents[c[2]]["e"]
-        if all(e <= p["start"] - 1 or s >= p["end"] + 1 for p in picked):
-            parts = [sents[k]["text"] for k in range(c[1], c[2] + 1)]
-            if not clip_title(parts, lang): continue  # no real sentence: skip, don't invent a title
-            i0, i1 = sents[c[1]]["i0"], sents[c[2]]["i1"]
-            bs, be = clip_bounds(words, i0, i1)
-            picked.append({"start": bs, "end": be, "score": clip_rating(c[0]), "score_raw": round(c[0], 2),
-                           "why": c[3], "hook": parts[0], "text": " ".join(parts), "sents": parts})
-        if len(picked) >= n: break
+        a2, b2 = c[1], c[2]
+        s, e = sents[a2]["s"], sents[b2]["e"]
+        if not all(e <= p["start"] - 1 or s >= p["end"] + 1 for p in picked):
+            continue
+        parts = [clean_speech(sents[k]["text"]) for k in range(a2, b2 + 1)]
+        parts = [p for p in parts if p]
+        if not parts or not clip_title(parts, lang):
+            continue  # no real sentence: skip, don't invent a title
+        i0, i1 = sents[a2]["i0"], sents[b2]["i1"]
+        bs, be = clip_bounds(words, i0, i1)
+        if any(not (be <= p["start"] + 0.05 or bs >= p["end"] - 0.05) for p in picked):
+            continue
+        picked.append({"start": bs, "end": be, "score": clip_rating(c[0]), "score_raw": round(c[0], 2),
+                       "why": c[3], "hook": parts[0], "text": clean_speech(" ".join(parts)), "sents": parts})
+        if len(picked) >= n:
+            break
     return picked
 
 def _cap_first(s):
@@ -474,50 +549,102 @@ def sent_strength(text, lang):
     if PROMO.search(raw): sc -= 3
     return sc
 
-def _tiny(w):
-    b = norm(w)
-    return len(b) < 3 and not any(c.isdigit() for c in b)
-
 def _title_ok(t):
     if not t: return False
     if t.lower().strip(" .") in {"best spoken moment", "najlepszy moment filmu"}: return False
     if re.search(r"[,;:]\s*$", t): return False
-    if norm(t.split()[-1]) in _CONJ: return False
+    if norm(t.split()[-1]) in _TRAIL: return False
     if PROMO.search(t): return False
     return True
 
+def _is_lead_fill(w):
+    """True for a filler, article or dangling conjunction. Keeps What / He / I."""
+    raw = (w or "").strip().strip("\"'“”„«»()[]").strip(".,;:!?…")
+    if not raw:
+        return True
+    b = norm(raw)
+    if not b:
+        return True
+    if b == "i" and raw[:1] not in ("I", "İ"):
+        return True  # Polish "i", not the English pronoun
+    return b in _LEAD_FILL
+
+def _strip_trail(words):
+    while words and norm(words[-1]) in _TRAIL:
+        words.pop()
+    return words
+
+def _shorten_phrase(phrase, limit=TITLE_MAX):
+    """Cut on a clause or a word boundary. Never in the middle of a word."""
+    phrase = (phrase or "").strip()
+    if len(phrase) <= limit:
+        return phrase
+    head = phrase[:limit]
+    if not phrase[limit].isspace():
+        sp = head.rfind(" ")
+        head = head[:sp] if sp > 0 else ""
+    head = head.rstrip()
+    comma = max(head.rfind(", "), head.rfind("; "))
+    if comma >= 40:
+        head = head[:comma]
+    return head.strip(" \t,;:–—-…")
+
+def clean_speech(text):
+    """Drop the same non-speech tokens burned subtitles and titles already skip."""
+    return " ".join(w for w in re.sub(r"\s+", " ", text or "").split() if not _junk_token(w)).strip()
+
 def clean_title(text):
-    """Strip fillers, URLs and cut-off tails; keep a 3-word / 15-char phrase, cap ~60."""
+    """One sentence: keep its start, drop trailing conjunctions, cap around 70 characters."""
     words = [w for w in re.sub(r"\s+", " ", text or "").strip().split() if not _junk_token(w)]
-    words = [re.sub(r"[,;:，]+$", "", w).strip(" \t\"'“”„«»") for w in words]
+    words = [w.strip(" \t\"'“”„«»()[]") for w in words]
     words = [w for w in words if w]
-    lead = lambda w: (not norm(w)) or norm(w) in _LEAD or norm(w) in _CONJ or _tiny(w)
-    while words and lead(words[0]): words.pop(0)
-    while len(words) > 3 and lead(words[-1]): words.pop()
-    while words and norm(words[-1]) in _CONJ: words.pop()
+    while words and _is_lead_fill(words[0]):
+        words.pop(0)
+    _strip_trail(words)
     phrase = re.sub(r"[\s,;:–—\-…]+$", "", " ".join(words)).strip()
-    if len(phrase) > 60:
-        cut = phrase[:60]; sp = cut.rfind(" ")
-        phrase = (cut[:sp] if sp >= 15 else cut).strip(" \t,;:–—-")
-        bits = phrase.split()
-        while len(bits) > 3 and lead(bits[-1]): bits.pop()
-        while bits and norm(bits[-1]) in _CONJ: bits.pop()
-        phrase = " ".join(bits)
+    phrase = _shorten_phrase(phrase)
+    bits = [w for w in phrase.split() if w]
+    _strip_trail(bits)
+    if bits:
+        bits[-1] = re.sub(r"[,;:]+$", "", bits[-1])
+        if not bits[-1]:
+            bits.pop()
+        _strip_trail(bits)
+    phrase = " ".join(bits).strip()
     toks = [norm(w) for w in phrase.split() if norm(w)]
-    if len(toks) < 3 or len(phrase) < 15 or len(toks) == 1: return ""
-    if all(t in _LEAD or t in _CONJ for t in toks): return ""
-    return _cap_first(phrase)
+    if len(toks) < 3 or len(phrase) < 15:
+        return ""
+    if all(t in _LEAD or t in _TRAIL for t in toks):
+        return ""
+    phrase = _cap_first(phrase)
+    if not _title_ok(phrase):
+        return ""
+    return phrase
+
+def _complete_sentences(parts):
+    """Join pause-split fragments up to the next . ! ? so the title is a whole sentence."""
+    out, buf = [], []
+    for p in parts:
+        p = re.sub(r"\s+", " ", p or "").strip()
+        if not p:
+            continue
+        buf.append(p)
+        if _sent_punct(p):
+            out.append(" ".join(buf))
+            buf = []
+    if buf:
+        out.append(" ".join(buf))
+    return out
 
 def _pick_title(parts, lang):
-    parts = [re.sub(r"\s+", " ", p).strip() for p in parts if p and str(p).strip()]
+    parts = _complete_sentences(parts)
+    if not parts:
+        return "", ""
     order = sorted(range(len(parts)), key=lambda i: (sent_strength(parts[i], lang), -i), reverse=True)
     for i in order:
         t = clean_title(parts[i])
-        if _title_ok(t): return t, parts[i]
-    content = [w.strip(".,;:!?…\"'“”„") for p in parts for w in p.split()
-               if not _junk_token(w) and len(norm(w)) > 2 and norm(w) not in _LEAD and norm(w) not in _CONJ]
-    t = clean_title(" ".join(w for w in content if w))
-    if _title_ok(t): return t, " ".join(content)
+        if t:
+            return t, parts[i]
     return "", ""
 
 def clip_title(parts, lang="en"):
@@ -532,9 +659,11 @@ def _clip_parts(m):
     return parts or ([blob] if blob else [])
 
 def title_and_tags(m, lang):
+    if m.get("text"):
+        m["text"] = clean_speech(m["text"])
     title, src = _pick_title(_clip_parts(m), lang)
     if not title: return "", "", []
-    m["hook"] = src or title
+    m["hook"] = clean_speech(src or title)
     toks = [norm(t) for t in m["text"].split() if not _junk_token(t)]
     freq = {}
     for t in toks:
@@ -608,6 +737,8 @@ def ass_time(t):
 
 def make_ass(words, iv, path, font, size=112, hl="&H0000E5FF", words_per=3):
     ws = [w for w in words if not _junk_token(w["w"]) and any(w["s"] < b and w["e"] > a for a, b in iv)]
+    ws.sort(key=lambda w: (w["s"], w["e"]))
+    out_end = sum(b - a for a, b in iv)
     head = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -631,8 +762,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             chunks.append(cur); cur = []
     for ch in chunks:
         for k, w in enumerate(ch):
-            st = src_to_out(w["s"], iv); en = src_to_out(ch[k+1]["s"], iv) if k + 1 < len(ch) else src_to_out(w["e"], iv) + 0.15
-            if en - st < 0.05: en = st + 0.05
+            st = min(src_to_out(w["s"], iv), out_end)
+            en = src_to_out(ch[k+1]["s"], iv) if k + 1 < len(ch) else src_to_out(max(w["e"], w["s"]), iv) + 0.15
+            en = min(max(en, st), out_end)
+            if en - st < 0.05:
+                en = min(out_end, st + 0.05)
+            if en - st < 0.02:
+                continue
             parts = []
             for j, x in enumerate(ch):
                 t = re.sub(r"[{}\\]", "", x["w"]).upper()
@@ -812,6 +948,7 @@ def main():
     moments = kept
     used_llm = llm_titles(moments, lang)
     od = OUT / vid; od.mkdir(parents=True, exist_ok=True); tmp = d / "tmp"; tmp.mkdir(exist_ok=True)
+    clear_clip_outputs(od)  # fewer clips than last time must not leave clip_04.mp4 behind
     t = time.time()
     from concurrent.futures import ThreadPoolExecutor
     def _r(im):
@@ -827,7 +964,24 @@ def main():
     write_summary(od, summ)
     print(od)
 
+def clear_clip_outputs(folder):
+    """Delete clip_01.mp4 / clip_04.ass / clip_05.jpg and any other clip_NN.* from an earlier run."""
+    folder = Path(folder)
+    if not folder.is_dir():
+        return []
+    gone = []
+    for p in list(folder.iterdir()):
+        if p.is_file() and _CLIP_FILE.match(p.name):
+            p.unlink()
+            gone.append(p.name)
+    return gone
+
 def write_summary(od, summ):
+    for m in summ.get("clips") or []:
+        if m.get("text"):
+            m["text"] = clean_speech(m["text"])
+        if m.get("hook"):
+            m["hook"] = clean_speech(m["hook"])
     (od / "summary.json").write_text(encoding="utf-8", data=json.dumps(summ, ensure_ascii=False, indent=2))
     moments = summ["clips"]
     md = [f"# {summ.get('title')}\n", f"Źródło: {summ.get('url')} · język: {summ.get('language')}\n"]
